@@ -3,7 +3,7 @@ import type { DashboardJob } from '../src/web/service.js';
 import { SCAN_PHASES, type ScanPhase } from '../src/scanner/progress.js';
 import type { DashboardReport } from '../src/web/view.js';
 import { batchTimeText, daysDoneText, doneText, duration, failureNotice, RATE_LIMITED_TEXT, rateLimited, FIRST_SCAN_NOTE, isFirstScan, progressAge, progressPercent,
-  progressState, progressTitle, readingText, utc } from './model.js';
+  progressState, progressTitle, readingText, sequenceText, utc } from './model.js';
 
 const labels: Record<ScanPhase, string> = {
   preparing: 'Preparing scan', registry: 'Loading StonkFun registry', metadata: 'Loading token metadata', planning: 'Planning days',
@@ -14,10 +14,11 @@ const labels: Record<ScanPhase, string> = {
 export const phaseLabel = (phase: ScanPhase | null) => phase ? labels[phase] : 'Saved job state';
 /** The scan dialog for a first scan, a refresh or a Load earlier batch, titled by the wallet it scans or by the batch's days. Its
  * top line names the UTC span the job reads, and once it finishes the span done with its new payouts from `report`, the job
- * wallet's report when in view. A batch says how long one usually takes. */
-export function Progress({ job, now, report = null, close, action, onRetry = () => undefined, onKey = () => undefined }: {
+ * wallet's report when in view. A batch says how long one usually takes, and within a Scan more Load, which of its batches it is. */
+export function Progress({ job, now, report = null, close, action, onRetry = () => undefined, onKey = () => undefined, sequence = null }: {
   job: DashboardJob; now: number; report?: DashboardReport | null; close: () => void; action: (kind: 'resume' | 'cancel') => void;
   /** Resumes the stopped job, or starts its kind again when it cannot resume. */ onRetry?: () => void; /** Opens the key form. */ onKey?: () => void;
+  /** The batch running within a Scan more Load, and how many it reads. */ sequence?: { index: number; total: number } | null;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   useEffect(() => { dialog.current?.showModal(); const node = dialog.current; return () => { node?.close(); }; }, []);
@@ -36,6 +37,7 @@ export function Progress({ job, now, report = null, close, action, onRetry = () 
   const range = job.status === 'complete' && !active ? doneText(job, shown) : readingText(job, loadedFrom);
   return <dialog ref={dialog} onCancel={event => { event.preventDefault(); close(); }} aria-labelledby="progress-title">
     <div className="panel-heading"><div><span className="eyebrow">SCAN JOURNEY / SAVED EVIDENCE</span><h2 id="progress-title">{title}</h2>
+      {sequence ? <p className="progress-sequence">{sequenceText(sequence)}</p> : null}
       {range ? <p className="progress-range">{range}</p> : null}</div><button onClick={close} aria-label="Dismiss progress">×</button></div>
     <div className="progress-hero">
       <div className="progress-time"><span className={`working-indicator ${active ? 'is-working' : ''}`}>{active ? 'WORKING' : job.status.toUpperCase()}</span><strong>{active ? 'Scanning for' : 'Duration'} {elapsed}</strong></div>

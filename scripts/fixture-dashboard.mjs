@@ -336,7 +336,7 @@ function seedLaterDay() {
 
 // Empty variant: a wallet whose first scan loaded the last seven days and found no StonkFun payout. The overview shows its empty
 // state with Load earlier instead of an empty chart.
-// Rescan dates: a wallet whose seven days were read once, before the range check existed. Its history holds two payouts from the
+// Scan more: a wallet whose seven days were read once, before the range check existed. Its history holds two payouts from the
 // feed-witnessed distributor; the saved read missed the second, which a rescan of its week finds and saves.
 const READ_ONCE_WALLET = key('read-once-wallet');
 const readOncePayout = (label, time, raw) => payout(label, time, FEED_DISTRIBUTOR, [leg({ destination: key('read-once-wallet-account'), owner: READ_ONCE_WALLET }, QUOTE_A, raw)]);

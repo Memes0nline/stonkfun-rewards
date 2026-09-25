@@ -183,7 +183,7 @@ describe('likely source launches per token', () => {
     const html = renderToStaticMarkup(createElement(SourceLaunches, { symbol: '$QUOTE', token: quote, sources: ready(result) }));
     const text = visible(html);
     // Without a stored snapshot the holdings are as of the latest retained transaction behind them.
-    expect(text.startsWith(`Launches you hold that pay in $QUOTE Holdings as of ${utc(CUTOFF - 3600)} · from retained transactions; Refresh rewards to check current holdings `
+    expect(text.startsWith(`Launches you hold that pay in $QUOTE Holdings as of ${utc(CUTOFF - 3600)} · from retained transactions; Check latest data to see current holdings `
       + 'The payout itself does not name its launch.')).toBe(true);
     expect(text).toContain(`$HELDL Synthetic held launch Holding now ${short(HELD)} Copy CA StonkFun ↗ Solscan ↗ Holds 5.000000 · last traded ${utc(CUTOFF - 5 * 86400)} Transaction ↗`);
     expect(text).toContain(`${short(SOLD)} Held earlier, sold Copy CA StonkFun ↗ Solscan ↗ None held now · last traded ${utc(CUTOFF - 4 * 86400)}`);

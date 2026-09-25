@@ -14,7 +14,7 @@ test('names the dates a refresh reads on its button, in the status chip and in t
   const errors: string[] = []; page.on('pageerror', error => { errors.push(error.message); });
   await page.goto(`${CONFIGURED}/`);
   const button = page.locator('.refresh-button');
-  await expect(button.locator('.button-label')).toHaveText('Refresh rewards');
+  await expect(button.locator('.button-label')).toHaveText('Check latest data');
   // Idle, the button says the refresh checks from the last cutoff to now.
   await expect(button.locator('.button-range')).toHaveText(new RegExp(`^Checks ${MINUTE} UTC → now$`));
   const from = /^Checks (.+) UTC → now$/.exec(await button.locator('.button-range').innerText())![1]!;

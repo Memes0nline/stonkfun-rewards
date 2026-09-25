@@ -102,16 +102,17 @@ test('a Helius rate limit on a running job is a banner, and the scan keeps going
   expect(errors).toEqual([]);
 });
 
-test('a loaded range with no payouts says what was checked and offers Load earlier, at desktop and phone width', async ({ page }) => {
+test('a loaded range with no payouts says what was checked and offers Scan more, at desktop and phone width', async ({ page }) => {
   const errors = errorsOf(page);
   await page.goto(`${CONFIGURED}/`); await expect(page.locator('.tabs')).toBeVisible();
   await page.getByLabel('Saved wallets').selectOption(EMPTY_WALLET);
   const empty = page.locator('.empty-history');
   await expect(empty.locator('h2')).toHaveText('No StonkFun payouts found between 2026-09-14 and today.');
-  await expect(empty).toContainText('Days before 2026-09-14 are not loaded yet. Load earlier history to check them.');
-  await expect(empty.getByRole('button', { name: 'Load earlier history' })).toBeEnabled();
+  await expect(empty).toContainText('Days before 2026-09-14 are not loaded yet. Scan more to check them.');
+  await expect(empty.getByRole('button', { name: 'Scan more' })).toBeEnabled();
   await expect(page.locator('.reward-chart')).toHaveCount(0);
-  await expect(page.locator('.refresh-floor')).toHaveText('Loaded 2026-09-14 → today · 45 days left to Aug 1');
+  await expect(page.locator('.refresh-floor')).toHaveText('Loaded 2026-09-14 → today');
+  await expect(page.locator('.refresh .more-button')).toHaveText('Scan more45 days left to Aug 1');
   await page.screenshot({ path: screenshot('empty-history.png'), fullPage: true });
   await page.setViewportSize({ width: 375, height: 812 });
   await expect(empty.locator('h2')).toBeVisible();
@@ -134,7 +135,7 @@ test('an invalid address gets an inline message and no request', async ({ page }
   await expect(input).toHaveAttribute('aria-describedby', 'wallet-error');
   await input.fill('abc');
   await expect(message).toHaveCount(0);
-  await page.getByRole('button', { name: 'Refresh rewards' }).click();
+  await page.getByRole('button', { name: 'Check latest data' }).click();
   await expect(message).toHaveText('That is not a Solana address: addresses are 32 to 44 characters, and this has 3.');
   await page.screenshot({ path: screenshot('wallet-invalid.png') });
   // The report on screen stays, and nothing was asked of the server.

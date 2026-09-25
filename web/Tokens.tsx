@@ -73,7 +73,7 @@ export function SourceLaunches({ symbol, token, sources, retry = () => undefined
   return <section className="sources" aria-label={sourcesHeading(symbol)}>
     <h4>{sourcesHeading(symbol)}</h4>
     {status === 'ready' && data?.holdingsAt ? <p className="sources-asof">Holdings as of {utc(Date.parse(data.holdingsAt) / 1000)}
-      {data.holdingsSource === 'history' ? ' · from retained transactions; Refresh rewards to check current holdings' : ''}</p> : null}
+      {data.holdingsSource === 'history' ? ' · from retained transactions; Check latest data to see current holdings' : ''}</p> : null}
     <p className="sources-sentence">{sourcesSentence(symbol)}</p>
     {status === 'loading' || status === 'idle' ? <p className="muted" role="status">{SOURCES_LOADING}</p>
       : status === 'failed' ? <div className="sources-failed" role="status"><p>{sources.reason === 'timeout' ? 'Checking launches is taking longer than 15 seconds.' : 'Launches could not be checked.'} Saved evidence is unchanged.</p>

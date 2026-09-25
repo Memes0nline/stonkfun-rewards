@@ -7,7 +7,7 @@ import type { Health, HistoryStatus } from './model.js';
 export function refreshBlock(health: Health | null, running: boolean): 'offline' | 'running' | null {
   return health?.offline ? 'offline' : running ? 'running' : null;
 }
-/** The primary button's text: Scan wallet for a wallet with no saved coverage, Refresh rewards for one with, or why neither is
+/** The primary button's text: Scan wallet for a wallet with no saved coverage, Check latest data for one with, or why neither is
  * available. It always acts on the wallet in view. */
 export function primaryText(block: 'offline' | 'running' | null, busy: boolean, scanned: boolean) {
   return block === 'offline' ? `Offline · ${scanned ? 'refresh' : 'scan'} disabled` : block === 'running' ? 'Scan running…' : busy ? 'Starting…' : primaryLabel(scanned);
@@ -33,24 +33,19 @@ export function UnscannedPanel({ wallet, health, running, busy, runningFor = nul
   </section>;
 }
 
-/** Load earlier history, or Continue loading with the days an interrupted batch saved, with the batch's days as its second line.
- * The header and Coverage show the same one. */
-export function EarlierButton({ earlier, disabled, onEarlier }: { earlier: NonNullable<HistoryStatus['earlier']>; disabled: boolean; onEarlier: () => void }) {
-  return <span className="earlier-control">
-    <button type="button" className="earlier-button" disabled={disabled} onClick={onEarlier}>{twoLines(earlier.label, earlier.range)}</button>
-    {earlier.note ? <span className="earlier-note">{earlier.note}</span> : null}
-  </span>;
+/** Scan more outside the header, in Coverage and the empty overview: it opens the Scan more list on the row it concerns. */
+export function ScanMoreButton({ disabled, onMore }: { disabled: boolean; onMore: () => void }) {
+  return <button type="button" className="more-link" disabled={disabled} onClick={onMore}>Scan more</button>;
 }
 
-/** The primary button for the wallet in view, and for a scanned wallet the last refresh and the loaded history beneath it: the
- * loaded range and the days left to the floor with Load earlier, or the full history at the floor. Disabled while this wallet's
- * scan runs or the server is offline, and, saying so, while another wallet's job runs. `range` is the button's second line: the
- * time the next scan reads, or while this wallet's job runs the span it reads. A scanned wallet also offers Rescan dates beside
- * it, which opens the dialog for checking chosen loaded days again; `rescanText` counts its days still to check. */
-export function RefreshControl({ health, running, busy, scanned = true, runningFor = null, lastRefresh, history = null, range = null, onRefresh, onEarlier = () => undefined,
-  onRescan = null, rescanText = 'Rescan dates', children }: {
+/** The primary button for the wallet in view, and for a scanned wallet Scan more beside it, the last refresh and the loaded range
+ * beneath. Both are disabled while this wallet's scan runs or the server is offline, and, saying so, while another wallet's job
+ * runs. `range` is the primary button's second line: the time the next scan reads, or while this wallet's job runs the span it
+ * reads. Scan more opens the list of 7-day batches back to the floor; `moreText` is its second line. */
+export function RefreshControl({ health, running, busy, scanned = true, runningFor = null, lastRefresh, history = null, range = null, onRefresh, onMore = null,
+  moreText = null, children }: {
   health: Health | null; running: boolean; busy: boolean; scanned?: boolean; runningFor?: string | null; lastRefresh: string; history?: HistoryStatus | null;
-  range?: string | null; onRefresh: () => void; onEarlier?: () => void; onRescan?: (() => void) | null; rescanText?: string; children?: ReactNode;
+  range?: string | null; onRefresh: () => void; onMore?: (() => void) | null; moreText?: string | null; children?: ReactNode;
 }) {
   const block = refreshBlock(health, running);
   const disabled = block !== null || busy || runningFor !== null;
@@ -58,22 +53,23 @@ export function RefreshControl({ health, running, busy, scanned = true, runningF
   return <div className="refresh">
     <div className="refresh-buttons"><button type="button" className="primary refresh-button" disabled={disabled} onClick={onRefresh}
       aria-describedby={described || undefined}>{twoLines(primaryText(block, busy, scanned), block === 'offline' ? null : range)}</button>
-    {scanned && onRescan ? <button type="button" className="rescan-button" disabled={disabled} onClick={onRescan}>{rescanText}</button> : null}</div>
+    {scanned && onMore ? <button type="button" className="more-button" disabled={disabled} onClick={onMore}>{twoLines('Scan more', moreText)}</button> : null}</div>
     {runningFor ? <span className="running-elsewhere" id="running-elsewhere">{runningElsewhereText(runningFor)}</span> : null}
     {scanned ? <span className="refresh-last" id="last-refresh">Last refresh {lastRefresh}</span> : null}
-    {history ? <span className="refresh-floor" id="history-loaded"><span className="history-loaded">{history.loaded}</span>
-      {history.left ? <span className="history-left"> · {history.left}</span> : null}</span> : null}
-    {history?.earlier ? <EarlierButton earlier={history.earlier} disabled={disabled} onEarlier={onEarlier}/> : null}
+    {history ? <span className="refresh-floor" id="history-loaded">{history.loaded}</span> : null}
     {children}
   </div>;
 }
 
 /**
- * The Helius key form, opened when refreshing finds no provider configured, or from the scan dialog after Helius rejected the key.
+ * The Helius key form, opened when a scan finds no provider configured, or from the scan dialog after Helius rejected the key. Its
+ * lead names what the key is for: scanning a wallet never scanned (`scanned` false), or refreshing one.
  * The key goes to the local server once and is cleared from the page; the browser keeps nothing. Remember (off by default) asks
  * the server to keep it in the ignored .env.
  */
-export function KeyForm({ save, close, rejected = false }: { save: (key: string, remember: boolean) => Promise<void>; close: () => void; rejected?: boolean }) {
+export function KeyForm({ save, close, rejected = false, scanned = true }: {
+  save: (key: string, remember: boolean) => Promise<void>; close: () => void; rejected?: boolean; scanned?: boolean;
+}) {
   const [key, setKey] = useState('');
   const [remember, setRemember] = useState(false);
   const [error, setError] = useState('');
@@ -92,7 +88,7 @@ export function KeyForm({ save, close, rejected = false }: { save: (key: string,
     catch (cause) { setError((cause as Error).message); } finally { setSaving(false); }
   };
   return <form className="key-form" role="dialog" aria-label="Helius API key" onSubmit={event => { void submit(event); }} autoComplete="off">
-    <p className="key-form-lead">{rejected ? <><b>Helius rejected your API key.</b> Enter the key again, then Retry.</> : <><b>No provider configured.</b> Enter a Helius API key to refresh rewards.</>}</p>
+    <p className="key-form-lead">{rejected ? <><b>Helius rejected your API key.</b> Enter the key again, then Retry.</> : <><b>No provider configured.</b> Enter a Helius API key to {scanned ? 'refresh rewards' : 'scan this wallet'}.</>}</p>
     <label className="key-field"><span>Helius API key</span>
       <input ref={input} type="password" name="helius-key" value={key} onChange={event => { setKey(event.target.value); }}
         autoComplete="off" spellCheck={false} aria-invalid={error ? true : undefined}/></label>

@@ -9,7 +9,7 @@ import { buildReport } from '../src/scanner/report.js';
 import { HISTORY_FLOOR, historyTarget, mergeRanges, planRanges } from '../src/scanner/ranges.js';
 import { DEMO_CUTOFF as cutoff, DEMO_WALLET as wallet, demoData, demoFetch, demoTransaction } from '../src/cli/demo.js';
 import { reportView } from '../src/web/view.js';
-import { historyStatus } from '../web/model.js';
+import { historyStatus, scanMoreBatches, scanMoreText } from '../web/model.js';
 import type { DemoData } from '../src/cli/demo.js';
 import type { ScanInput } from '../src/scanner/engine.js';
 import type { Job, Range, ScanProgress } from '../src/scanner/types.js';
@@ -163,8 +163,10 @@ describe('history floor', () => {
     expect(report.history).toMatchObject({ floor: HISTORY_FLOOR, loadedFrom: day('2026-09-01'), oldestLoadedDay: '2026-09-01', earlierRemaining: true,
       notLoadedYet: { startTime: HISTORY_FLOOR, endTime: day('2026-09-01'), days: 31 }, nextBatch: { startTime: day('2026-08-25'), endTime: day('2026-09-01'), days: 7 } });
     expect(report.coverage.gaps).toEqual([]);
-    expect(historyStatus(reportView(report))).toEqual({ loaded: 'Loaded 2026-09-01 → today', left: '31 days left to Aug 1',
-      earlier: { label: 'Load earlier history', note: null, range: 'Loads 2026-08-25 → 2026-08-31' } });
+    const view = reportView(report);
+    expect(historyStatus(view)).toEqual({ loaded: 'Loaded 2026-09-01 → today' });
+    expect(scanMoreText(view)).toBe('31 days left to Aug 1');
+    expect(scanMoreBatches(view).find(batch => batch.back === 1)?.label).toBe('2026-08-25 → 2026-08-31');
     // Reading the report changes nothing saved.
     expect({ wallet: store.wallet('mainnet-beta', wallet), coverage: store.coverage('mainnet-beta', wallet) }).toEqual(saved);
 

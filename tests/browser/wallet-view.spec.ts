@@ -13,7 +13,7 @@ const WAITING = `Waits${'4'.repeat(39)}`;
 const THIRD = `Third${'5'.repeat(39)}`;
 const PHONE = `Phone${'6'.repeat(39)}`;
 const short = (value: string) => `${value.slice(0, 5)}…${value.slice(-5)}`;
-const FIRST_SCAN_NOTE = 'The first scan covers the last 7 days and takes a minute or two. Older history loads afterwards in 7-day batches.';
+const FIRST_SCAN_NOTE = 'The first scan covers the last 7 days and takes a few minutes. Older history loads afterwards in 7-day batches.';
 
 test.beforeEach(async ({ context }) => {
   await context.route('**/*', route => route.request().url().startsWith(`${CONFIGURED}/`) ? route.continue() : route.abort());
@@ -45,7 +45,7 @@ test('a pasted unscanned address becomes the view with Scan wallet, and its firs
   const button = page.locator('.refresh-button');
   await expect(button).toHaveText(/^Scan wallet/); await expect(button).toBeEnabled();
   await expect(page.locator('.refresh-last')).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Refresh rewards' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Check latest data' })).toHaveCount(0);
   const panel = page.locator('.unscanned');
   await expect(panel.locator('h2')).toHaveText(`${short(FRESH)} has not been scanned yet.`);
   await expect(panel.getByRole('button', { name: 'Scan wallet' })).toBeEnabled();
@@ -66,9 +66,9 @@ test('a pasted unscanned address becomes the view with Scan wallet, and its firs
   await page.keyboard.press('Escape');
   await expect(button).toHaveText(/^Scan running…/);
   await expect(state(page)).toHaveText(/^WORKING · \d{4}-\d{2}-\d{2}$/);
-  // Finished, its report replaces the panel, it joins the saved list, and the button becomes Refresh rewards.
+  // Finished, its report replaces the panel, it joins the saved list, and the button becomes Check latest data.
   await expect(panel).toHaveCount(0, { timeout: 30_000 });
-  await expect(button).toHaveText(/^Refresh rewards/); await expect(button).toBeEnabled();
+  await expect(button).toHaveText(/^Check latest data/); await expect(button).toBeEnabled();
   await expect(state(page)).toHaveText('COMPLETE');
   await expect(page.locator('.refresh-last')).toHaveText(/^Last refresh 2026-\d\d-\d\d \d\d:\d\d UTC$/);
   await expect(page.locator('.refresh-floor')).toContainText(/^Loaded 2026-\d\d-\d\d → today/);
@@ -79,13 +79,13 @@ test('a pasted unscanned address becomes the view with Scan wallet, and its firs
   expect(errors).toEqual([]);
 });
 
-test('choosing a saved wallet, or typing one, views it with Refresh rewards and its last refresh', async ({ page }) => {
+test('choosing a saved wallet, or typing one, views it with Check latest data and its last refresh', async ({ page }) => {
   const errors = errorsOf(page);
   await ready(page);
   await page.getByLabel('Saved wallets').selectOption(LONG_WALLET);
   await expect(box(page)).toHaveValue(LONG_WALLET);
   await expect(page.locator('.status-wallet')).toHaveText(short(LONG_WALLET));
-  await expect(page.locator('.refresh-button')).toHaveText(/^Refresh rewards/);
+  await expect(page.locator('.refresh-button')).toHaveText(/^Check latest data/);
   await expect(page.locator('.refresh-button')).toBeEnabled();
   await expect(page.locator('.refresh-last')).toHaveText(/^Last refresh 2026-/);
   await expect(state(page)).not.toHaveText('Not scanned yet');
@@ -94,7 +94,7 @@ test('choosing a saved wallet, or typing one, views it with Refresh rewards and 
   await box(page).fill(`  ${EMPTY_WALLET}  `);
   await expect(page.locator('.status-wallet')).toHaveText(short(EMPTY_WALLET));
   await expect(page.getByLabel('Saved wallets')).toHaveValue(EMPTY_WALLET);
-  await expect(page.locator('.refresh-button')).toHaveText(/^Refresh rewards/);
+  await expect(page.locator('.refresh-button')).toHaveText(/^Check latest data/);
   await expect(page.locator('.empty-history')).toBeVisible();
   expect(errors).toEqual([]);
 });
@@ -106,14 +106,15 @@ test('while one wallet scans the view can switch, and every other wallet waits, 
   await page.locator('.unscanned').getByRole('button', { name: 'Scan wallet' }).click();
   await expect(page.getByRole('dialog', { name: `Scanning ${short(WAITING)}: last 7 days` })).toBeVisible();
   await page.keyboard.press('Escape');
-  // Another saved wallet: in view, but its Refresh rewards and Load earlier wait.
+  // Another saved wallet: in view, but its Check latest data and Scan more wait.
   await page.getByLabel('Saved wallets').selectOption(EMPTY_WALLET);
   await expect(page.locator('.status-wallet')).toHaveText(short(EMPTY_WALLET));
   const button = page.locator('.refresh-button');
-  await expect(button).toHaveText(/^Refresh rewards/); await expect(button).toBeDisabled();
+  await expect(button).toHaveText(/^Check latest data/); await expect(button).toBeDisabled();
   await expect(page.locator('.refresh .running-elsewhere')).toHaveText(`A scan is running for ${short(WAITING)}`);
   await expect(button).toHaveAttribute('aria-describedby', /running-elsewhere/);
-  await expect(page.locator('.empty-history').getByRole('button', { name: 'Load earlier history' })).toBeDisabled();
+  await expect(page.locator('.refresh .more-button')).toBeDisabled();
+  await expect(page.locator('.empty-history').getByRole('button', { name: 'Scan more' })).toBeDisabled();
   await page.screenshot({ path: screenshot('wallet-running-elsewhere.png') });
   // Another unscanned wallet: its panel's Scan wallet waits too.
   await box(page).fill(THIRD);
@@ -127,7 +128,7 @@ test('while one wallet scans the view can switch, and every other wallet waits, 
   await expect(button).toHaveText(/^Scan running…/);
   await expect(page.locator('.running-elsewhere')).toHaveCount(0);
   // Once it finishes, every wallet can start again.
-  await expect(button).toHaveText(/^Refresh rewards/, { timeout: 30_000 });
+  await expect(button).toHaveText(/^Check latest data/, { timeout: 30_000 });
   await box(page).fill(THIRD);
   await expect(scan).toBeEnabled();
   await expect(page.locator('.running-elsewhere')).toHaveCount(0);
@@ -149,7 +150,7 @@ test('a first launch with no saved wallet focuses the empty wallet box and scans
   await expect(page.locator('.status-wallet')).toHaveCount(0);
   await expect(page.locator('.tabs')).toHaveCount(0);
   await expect(page.locator('.refresh-button')).toHaveText(/^Scan wallet/);
-  await expect(page.getByRole('button', { name: 'Refresh rewards' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Check latest data' })).toHaveCount(0);
   await page.screenshot({ path: screenshot('wallet-first-launch.png') });
   await page.locator('.refresh-button').click();
   await expect(page.locator('#wallet-error')).toHaveText('Enter a public Solana wallet address.');
@@ -183,7 +184,7 @@ test('at phone width the header names the wallet in view and the panel fits', as
   // A scanned wallet's header keeps its address, status and last refresh within the width.
   await page.getByLabel('Saved wallets').selectOption(DEMO_WALLET);
   await expect(page.locator('.status-wallet')).toHaveText(short(DEMO_WALLET));
-  await expect(page.locator('.refresh-button')).toHaveText(/^Refresh rewards/);
+  await expect(page.locator('.refresh-button')).toHaveText(/^Check latest data/);
   await expect(page.locator('.status-refresh')).toBeVisible();
   expect(await overflow(page)).toBeLessThanOrEqual(0);
   await page.screenshot({ path: screenshot('wallet-scanned-mobile.png') });

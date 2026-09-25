@@ -87,10 +87,10 @@ test.describe('status dropdown', () => {
 });
 
 test.describe('refresh control', () => {
-  test('reads Refresh rewards with the last refresh beneath, and says Scan running while this wallet scans', async ({ page }) => {
+  test('reads Check latest data with the last refresh beneath, and says Scan running while this wallet scans', async ({ page }) => {
     await ready(page);
     const refresh = page.locator('.refresh-button');
-    await expect(refresh).toHaveText(/^Refresh rewards/);
+    await expect(refresh).toHaveText(/^Check latest data/);
     await expect(refresh).toBeEnabled();
     await expect(page.locator('.refresh-last')).toHaveText(/^Last refresh 2026-\d\d-\d\d \d\d:\d\d UTC$/);
     await refresh.click();
@@ -102,7 +102,7 @@ test.describe('refresh control', () => {
     await expect(page.locator('.status-button')).toContainText('WORKING');
     await page.screenshot({ path: screenshot('ux-refresh-running.png') });
     // The fixture scan completes; the button returns with the new last refresh.
-    await expect(refresh).toHaveText(/^Refresh rewards/, { timeout: 20_000 });
+    await expect(refresh).toHaveText(/^Check latest data/, { timeout: 20_000 });
     await expect(refresh).toBeEnabled();
     await expect(page.locator('.status-button')).toContainText('COMPLETE');
   });
@@ -142,7 +142,7 @@ test.describe('refresh control', () => {
     await page.screenshot({ path: screenshot('ux-key-form.png') });
     await form.getByRole('button', { name: 'Save' }).click();
     await expect(form).toHaveCount(0);
-    await expect(page.locator('.refresh-note')).toHaveText('Provider configured. Refresh rewards when ready.');
+    await expect(page.locator('.refresh-note')).toHaveText('Provider configured. Check latest data when ready.');
     // Posted exactly once, to the key endpoint, with Remember off.
     const posts = bodies.filter(body => body.includes(SYNTHETIC_KEY));
     expect(posts).toEqual([`${UNCONFIGURED}/api/v1/provider-key {"key":"${SYNTHETIC_KEY}","remember":false}`]);

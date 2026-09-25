@@ -24,12 +24,12 @@ import {
   periodOptions, periodParams, periodSummary, progressAge, progressPercent, progressState, REASON_TEXT, resolvePeriod, routeHash, secondsText, short, sortTokens, staleText,
   TABS, trackedDays, trustSourceRows, usd, avatarHue, utc, verifiedHidden, tokenPalette, tokenColor, TOKEN_COLORS, OTHER_COLOR, daySegments,
   DEFAULT_RECEIPT_SORT, parseReceiptSort, receiptSortParam, receiptSortText, sortReceipts, sortUsdRows, FIRST_SCAN_NOTE, isFirstScan, coverageTarget,
-  tokenRanking, chartTicks, tickText, usdExact, historyStatus, batchLabel, batchTimeText, runTimeText, LOAD_EARLIER_REASON, failureNotice, rateLimited,
+  tokenRanking, chartTicks, tickText, usdExact, historyStatus, batchLabel, batchTimeText, runTimeText, SCAN_MORE_REASON, failureNotice, rateLimited,
   RATE_LIMITED_TEXT, noPayouts, emptyHistoryText, walletInputError, hasSavedCoverage, NOT_SCANNED, primaryLabel, progressTitle, UNSCANNED_NOTE, walletStatusText,
-  runningElsewhere, runningElsewhereText, spanText, firstScanRangeText, refreshRangeText, runningRangeText, readingText, daysDoneText, workingText, newPayouts,
+  runningElsewhere, runningElsewhereText, scanMoreBatches, scanMoreText, batchStatusText, spanText, firstScanRangeText, refreshRangeText, runningRangeText, readingText, daysDoneText, workingText, newPayouts,
   doneText,
 } from '../web/model.js';
-import { primaryText, RefreshControl, UnscannedPanel } from '../web/Refresh.js';
+import { KeyForm, primaryText, RefreshControl, UnscannedPanel } from '../web/Refresh.js';
 import { Progress } from '../web/Progress.js';
 import type { DayBucket, Period, Receipt, ReceiptFilters, ReceiptSort, TokenPalette, TokenSort } from '../web/model.js';
 import { EvidenceModal, PayoutsTab } from '../web/Payouts.js';
@@ -1102,20 +1102,20 @@ describe('overview period: the hero figures and the chart share one period', () 
     expect(trackedDays(edges)).toEqual({ first: '2026-09-20', last: '2026-09-22', count: 3 });
     expect(resolvePeriod(edges, {})).toEqual({ period: { id: 'all', start: '2026-09-20', end: '2026-09-22', days: 3 }, notice: null });
     // Earlier history remains, and the days back to the floor would cover 7D.
-    expect(resolvePeriod(edges, { period: '7d' }).notice).toBe('7D needs earlier history; load earlier history to enable it; showing ALL.');
+    expect(resolvePeriod(edges, { period: '7d' }).notice).toBe('7D needs earlier history; Scan more to enable it; showing ALL.');
     expect(periodSummary(edges, resolvePeriod(edges, {}).period)).toMatchObject({ usd: '30.000000', receipts: 5, averageUsd: '10.000000' });
   });
 
   it('disables each fixed period until tracked history covers it, saying how many days it needs or to load earlier history', () => {
     const view = reportView(buildReport(attributedStore(), WALLET));
     expect(periodOptions(view).map(option => [option.label, option.period.start, option.period.end, option.period.days, option.reason])).toEqual([
-      ['7D', '2026-09-16', '2026-09-22', 7, null], ['14D', '2026-09-09', '2026-09-22', 14, LOAD_EARLIER_REASON],
-      ['30D', '2026-08-24', '2026-09-22', 30, LOAD_EARLIER_REASON], ['60D', '2026-07-25', '2026-09-22', 60, 'needs 60 days of tracked history'],
+      ['7D', '2026-09-16', '2026-09-22', 7, null], ['14D', '2026-09-09', '2026-09-22', 14, SCAN_MORE_REASON],
+      ['30D', '2026-08-24', '2026-09-22', 30, SCAN_MORE_REASON], ['60D', '2026-07-25', '2026-09-22', 60, 'needs 60 days of tracked history'],
       ['90D', '2026-06-25', '2026-09-22', 90, 'needs 90 days of tracked history'], ['ALL', '2026-09-12', '2026-09-22', 11, null]]);
     // Exactly as many tracked days as a period needs enables it; one fewer does not.
     const since = (day: string) => ({ ...view, trackingStart: Date.parse(`${day}T12:00:00Z`) / 1000 });
     expect(periodOptions(since('2026-09-09'))[1]!.reason).toBeNull();
-    expect(periodOptions(since('2026-09-10'))[1]!.reason).toBe(LOAD_EARLIER_REASON);
+    expect(periodOptions(since('2026-09-10'))[1]!.reason).toBe(SCAN_MORE_REASON);
     const long = { ...view, trackingStart: CUTOFF - 100 * 86_400 };
     expect(periodOptions(long).map(option => [option.label, option.period.days, option.reason])).toEqual([['7D', 7, null], ['14D', 14, null], ['30D', 30, null],
       ['60D', 60, null], ['90D', 90, null], ['ALL', 101, null]]);
@@ -1127,7 +1127,7 @@ describe('overview period: the hero figures and the chart share one period', () 
       + '<span class="period-tip" role="tooltip" id="period-reason-60d">needs 60 days of tracked history</span>');
     expect(short.match(/aria-disabled="true"/g)).toHaveLength(4);
     expect(short).not.toContain(' disabled=""');
-    expect(textOf(short)).toBe('7D 14D Load earlier history to enable 30D Load earlier history to enable 60D needs 60 days of tracked history '
+    expect(textOf(short)).toBe('7D 14D Scan more to enable 30D Scan more to enable 60D needs 60 days of tracked history '
       + '90D needs 90 days of tracked history ALL CUSTOM');
     expect(control(long)).not.toContain('aria-disabled');
     expect(textOf(control(long))).toBe('7D 14D 30D 60D 90D ALL CUSTOM');
@@ -1183,7 +1183,7 @@ describe('overview period: the hero figures and the chart share one period', () 
     const view = reportView(buildReport(attributedStore(), WALLET));
     expect(resolvePeriod(view, {})).toEqual({ period: { id: '7d', start: '2026-09-16', end: '2026-09-22', days: 7 }, notice: null });
     expect(resolvePeriod(view, { period: 'all' })).toEqual({ period: { id: 'all', start: '2026-09-12', end: '2026-09-22', days: 11 }, notice: null });
-    expect(resolvePeriod(view, { period: '30d' })).toEqual({ period: defaultPeriod(view), notice: '30D needs earlier history; load earlier history to enable it; showing 7D.' });
+    expect(resolvePeriod(view, { period: '30d' })).toEqual({ period: defaultPeriod(view), notice: '30D needs earlier history; Scan more to enable it; showing 7D.' });
     expect(routeHash({ tab: 'overview', params: periodParams(defaultPeriod(view)) })).toBe('#overview?period=7d');
     expect(parseRoute('#overview?period=90d')).toEqual({ tab: 'overview', params: { period: '90d' } });
     const long = { ...view, trackingStart: CUTOFF - 100 * 86_400 };
@@ -1735,42 +1735,45 @@ describe('layered history on the dashboard', () => {
     return store;
   };
   const header = (report: DashboardReport | null, busy = false) => renderToStaticMarkup(createElement(RefreshControl, { health: null, running: false, busy,
-    lastRefresh: 'never', history: report ? historyStatus(report) : null, onRefresh: () => undefined }));
+    lastRefresh: 'never', history: report ? historyStatus(report) : null, onRefresh: () => undefined, ...report ? { onMore: () => undefined, moreText: scanMoreText(report) } : {} }));
   const LOADED_FROM = DEMO_CUTOFF - 10 * 86400;
 
-  it('shows the loaded range, the days left to the floor and Load earlier while earlier history remains', () => {
+  it('shows the loaded range, and Scan more with the days left to the floor while earlier history remains', () => {
     const report = reportView(buildReport(covered(open(), { startTime: LOADED_FROM, endTime: DEMO_CUTOFF }), DEMO_WALLET));
     expect(report.history.oldestLoadedDay).toBe('2026-09-11');
-    expect(historyStatus(report)).toEqual({ loaded: 'Loaded 2026-09-11 → today', left: '42 days left to Aug 1',
-      earlier: { label: 'Load earlier history', note: null, range: 'Loads 2026-09-04 → 2026-09-11' } });
+    expect(historyStatus(report)).toEqual({ loaded: 'Loaded 2026-09-11 → today' });
     const html = header(report);
-    expect(textOf(html)).toBe('Refresh rewards Last refresh never Loaded 2026-09-11 → today · 42 days left to Aug 1 Load earlier history Loads 2026-09-04 → 2026-09-11');
+    expect(textOf(html)).toBe('Check latest data Scan more 42 days left to Aug 1 Last refresh never Loaded 2026-09-11 → today');
     expect(html).toContain('aria-describedby="last-refresh history-loaded"');
-    expect(html).toContain('<button type="button" class="earlier-button"><span class="button-label">Load earlier history</span><span class="button-range">Loads 2026-09-04 → 2026-09-11</span></button>');
-    // A running scan or a start in flight disables it, as it disables Refresh.
-    expect(header(report, true)).toContain('<button type="button" class="earlier-button" disabled=""><span class="button-label">Load earlier history</span>');
+    expect(html).toContain('<button type="button" class="more-button"><span class="button-label">Scan more</span><span class="button-range">42 days left to Aug 1</span></button>');
+    // Neither Rescan dates nor a separate Load earlier button is left.
+    expect(html).not.toMatch(/Rescan|Load earlier|Continue loading|earlier-button/);
+    // A running scan or a start in flight disables it, as it disables Check latest data.
+    expect(header(report, true)).toContain('<button type="button" class="more-button" disabled=""><span class="button-label">Scan more</span>');
     // No wallet on screen: no history line and no control.
-    expect(textOf(header(null))).toBe('Refresh rewards Last refresh never');
+    expect(textOf(header(null))).toBe('Check latest data Last refresh never');
   });
 
-  it('shows the full history since the floor, and no Load earlier, once loaded back to the floor', () => {
+  it('shows the full history since the floor, and Scan more with the days to check, once loaded back to the floor', () => {
     const report = reportView(buildReport(covered(open(), { startTime: LOADED_FROM, endTime: DEMO_CUTOFF }, HISTORY_FLOOR), DEMO_WALLET));
-    expect(historyStatus(report)).toEqual({ loaded: 'Full history since 2026-08-01', left: null, earlier: null });
-    expect(textOf(header(report))).toBe('Refresh rewards Last refresh never Full history since 2026-08-01');
+    expect(historyStatus(report)).toEqual({ loaded: 'Full history since 2026-08-01' });
+    expect(textOf(header(report))).toBe(`Check latest data Scan more ${scanMoreText(report)} Last refresh never Full history since 2026-08-01`);
+    expect(scanMoreText(report)).toMatch(/^\d+ days to check$/);
     expect(header(report)).not.toContain('earlier-button');
   });
 
-  it('offers Continue loading with the days an interrupted batch saved', () => {
+  it('shows the days an interrupted batch saved on its Scan more row', () => {
     const batch = { startTime: LOADED_FROM - 7 * 86400, endTime: LOADED_FROM };
     const store = savedDays(covered(open(), { startTime: LOADED_FROM, endTime: DEMO_CUTOFF }), { startTime: LOADED_FROM - 3 * 86400, endTime: LOADED_FROM });
     const report = reportView(buildReport(store, DEMO_WALLET));
     expect(report.history.nextBatch).toEqual({ ...batch, days: 7 });
-    expect(historyStatus(report)).toEqual({ loaded: 'Loaded 2026-09-11 → today', left: '42 days left to Aug 1',
-      earlier: { label: 'Continue loading', note: '3 of 7 days saved', range: 'Loads 2026-09-04 → 2026-09-11' } });
-    expect(textOf(header(report))).toBe('Refresh rewards Last refresh never Loaded 2026-09-11 → today · 42 days left to Aug 1 Continue loading Loads 2026-09-04 → 2026-09-11 3 of 7 days saved');
-    // Days saved outside the next batch are not counted toward it.
+    const next = scanMoreBatches(report).find(item => item.back === 1)!;
+    expect(next).toMatchObject({ ...batch, saved: 3, days: 7 });
+    expect(batchStatusText(next)).toBe('Not loaded · 3 of 7 days saved');
+    expect(textOf(header(report))).toBe('Check latest data Scan more 42 days left to Aug 1 Last refresh never Loaded 2026-09-11 → today');
+    // Days saved in another batch count toward that batch only.
     const outside = reportView(buildReport(savedDays(covered(open(), { startTime: LOADED_FROM, endTime: DEMO_CUTOFF }), { startTime: HISTORY_FLOOR, endTime: HISTORY_FLOOR + 86400 }), DEMO_WALLET));
-    expect(historyStatus(outside).earlier).toEqual({ label: 'Load earlier history', note: null, range: 'Loads 2026-09-04 → 2026-09-11' });
+    expect(scanMoreBatches(outside).filter(item => item.saved > 0).map(item => [item.label, batchStatusText(item)])).toEqual([['2026-08-01 → 2026-08-07 14:13', 'Not loaded · 1 of 7 days saved']]);
   });
 
   it('labels a batch by its UTC days and says how long the last one took', () => {
@@ -1788,15 +1791,16 @@ describe('layered history on the dashboard', () => {
     expect([0, 59.6, 60, 120, 3599, 3600, 3660, 7200].map(runTimeText)).toEqual(['0 s', '1 min', '1 min', '2 min', '59 min 59 s', '1 h', '1 h 1 min', '2 h']);
   });
 
-  it('lists the days not loaded yet in Coverage apart from gaps, with the same Load earlier control', () => {
+  it('lists the days not loaded yet in Coverage apart from gaps, with Scan more', () => {
     const report = reportView(buildReport(covered(open(), { startTime: LOADED_FROM, endTime: DEMO_CUTOFF }), DEMO_WALLET));
-    const html = renderToStaticMarkup(createElement(Coverage, { report, reclassify: () => undefined, canReclassify: false, canEarlier: true, onEarlier: () => undefined }));
+    const html = renderToStaticMarkup(createElement(Coverage, { report, reclassify: () => undefined, canReclassify: false, canMore: true, onMore: () => undefined }));
     expect(textOf(html)).toContain(`COMPLETE ${utc(LOADED_FROM)} → ${utc(DEMO_CUTOFF)} NOT LOADED YET 2026-08-01 00:00 UTC → ${utc(LOADED_FROM)} · 42 days `
-      + 'Not scanned yet, so not a gap. Each batch loads 7 more days back to 2026-08-01. Load earlier history Loads 2026-09-04 → 2026-09-11');
+      + 'Not scanned yet, so not a gap. Each batch loads 7 more days back to 2026-08-01. Scan more');
     expect(html).toContain('<div class="not-loaded">');
     expect(html).not.toContain('<li class="warning">');
     // Without a start allowed (a scan running, or offline) the control shows but is disabled.
-    expect(coverageText(report)).toContain('class="earlier-button" disabled=""><span class="button-label">Load earlier history');
+    expect(coverageText(report)).toContain('<button type="button" class="more-link" disabled="">Scan more</button></div>');
+    expect(html).not.toMatch(/Rescan|Load earlier/);
     const floor = reportView(buildReport(covered(open(), { startTime: LOADED_FROM, endTime: DEMO_CUTOFF }, HISTORY_FLOOR), DEMO_WALLET));
     expect(coverageText(floor)).not.toContain('NOT LOADED YET');
   });
@@ -1804,12 +1808,16 @@ describe('layered history on the dashboard', () => {
   it('asks for earlier history on a period the days back to the floor would cover, and names the days otherwise', () => {
     const report = reportView(buildReport(covered(open(), { startTime: LOADED_FROM, endTime: DEMO_CUTOFF }), DEMO_WALLET));
     // Loaded 2026-09-11 → 2026-09-21: 11 days. The floor makes 52 days reachable, so 14D and 30D wait for Load earlier and 60D cannot.
-    expect(periodOptions(report).map(option => [option.label, option.reason])).toEqual([['7D', null], ['14D', LOAD_EARLIER_REASON], ['30D', LOAD_EARLIER_REASON],
+    expect(periodOptions(report).map(option => [option.label, option.reason])).toEqual([['7D', null], ['14D', SCAN_MORE_REASON], ['30D', SCAN_MORE_REASON],
       ['60D', 'needs 60 days of tracked history'], ['90D', 'needs 90 days of tracked history'], ['ALL', null]]);
-    expect(LOAD_EARLIER_REASON).toBe('Load earlier history to enable');
-    expect(resolvePeriod(report, { period: '14d' }).notice).toBe('14D needs earlier history; load earlier history to enable it; showing 7D.');
+    expect(SCAN_MORE_REASON).toBe('Scan more to enable');
+    expect(resolvePeriod(report, { period: '14d' }).notice).toBe('14D needs earlier history; Scan more to enable it; showing 7D.');
     const control = textOf(renderToStaticMarkup(createElement(PeriodControl, { report, period: defaultPeriod(report), onPeriod: () => undefined })));
-    expect(control).toBe('7D 14D Load earlier history to enable 30D Load earlier history to enable 60D needs 60 days of tracked history 90D needs 90 days of tracked history ALL CUSTOM');
+    expect(control).toBe('7D 14D Scan more to enable 30D Scan more to enable 60D needs 60 days of tracked history 90D needs 90 days of tracked history ALL CUSTOM');
+    // Given Scan more, those periods open it instead of reading as disabled; 60D stays disabled.
+    const withMore = renderToStaticMarkup(createElement(PeriodControl, { report, period: defaultPeriod(report), onPeriod: () => undefined, onMore: () => undefined }));
+    expect(withMore).toContain('<button type="button" class="needs-more" aria-pressed="false" aria-describedby="period-reason-14d">14D</button>');
+    expect(withMore).toContain('<button type="button" aria-pressed="false" aria-disabled="true" aria-describedby="period-reason-60d">60D</button>');
     // At the floor nothing earlier can load, so every short period names its days.
     const floor = reportView(buildReport(covered(open(), { startTime: LOADED_FROM, endTime: DEMO_CUTOFF }, LOADED_FROM + 5 * 86400), DEMO_WALLET));
     expect(periodOptions({ ...floor, history: { ...floor.history, earlierRemaining: false } })[1]!.reason).toBe('needs 14 days of tracked history');
@@ -1918,12 +1926,12 @@ describe('layered history on the dashboard', () => {
       expect(textOf(statusHtml(null, null, stoppedJob(base, 'network')))).toContain('No connection. Check your internet and try again. Completed days are saved: 3 of 7. View scan progress');
     });
 
-    it('replaces an empty chart with what was checked, offering Load earlier until the floor', () => {
+    it('replaces an empty chart with what was checked, offering Scan more until the floor', () => {
       const report = reportView(buildReport(covered(open(), { startTime: DEMO_CUTOFF - 7 * 86400, endTime: DEMO_CUTOFF }), DEMO_WALLET));
       expect(noPayouts(report)).toBe(true);
-      const html = renderToStaticMarkup(createElement(Overview, { report, canEarlier: true }));
+      const html = renderToStaticMarkup(createElement(Overview, { report, canMore: true }));
       expect(textOf(html)).toBe('LOADED HISTORY No StonkFun payouts found between 2026-09-14 and today. Days before 2026-09-14 are not loaded yet. '
-        + 'Load earlier history to check them. Load earlier history Loads 2026-09-07 → 2026-09-14');
+        + 'Scan more to check them. Scan more');
       expect(html).not.toContain('reward-chart');
       expect(html).not.toContain('period-control');
       const floor = reportView(buildReport(covered(open(), { startTime: DEMO_CUTOFF - 7 * 86400, endTime: DEMO_CUTOFF }, HISTORY_FLOOR), DEMO_WALLET));
@@ -1957,7 +1965,7 @@ describe('layered history on the dashboard', () => {
     const dialog = (job: Job) => renderToStaticMarkup(createElement(Progress, { job, now: job.progress.serverNow, close: () => undefined, action: () => undefined }));
     const panel = (running: boolean) => renderToStaticMarkup(createElement(UnscannedPanel, { wallet: DEMO_WALLET, health: null, running, busy: false, onScan: () => undefined }));
 
-    it('offers Scan wallet for a wallet with no saved coverage and Refresh rewards once it has some', () => {
+    it('offers Scan wallet for a wallet with no saved coverage and Check latest data once it has some', () => {
       // Untracked: the server has no report. Admitted: its first scan has not saved a day, so it has no coverage and no sync.
       expect(hasSavedCoverage(null)).toBe(false);
       const store = open(); harness(store, blocked).service.start(DEMO_WALLET);
@@ -1967,15 +1975,22 @@ describe('layered history on the dashboard', () => {
       const loaded = loadedReport();
       expect(hasSavedCoverage(loaded)).toBe(true);
       expect(hasSavedCoverage({ coverage: admitted.coverage, lastSync: '2026-09-21T00:00:00.000Z' })).toBe(true);
-      expect([primaryLabel(false), primaryLabel(true)]).toEqual(['Scan wallet', 'Refresh rewards']);
+      expect([primaryLabel(false), primaryLabel(true)]).toEqual(['Scan wallet', 'Check latest data']);
       // Each state of the button: its action, a start in flight, this wallet's scan running, and offline.
       expect([false, true].map(scanned => [primaryText(null, false, scanned), primaryText(null, true, scanned), primaryText('running', false, scanned),
         primaryText('offline', false, scanned)])).toEqual([['Scan wallet', 'Starting…', 'Scan running…', 'Offline · scan disabled'],
-        ['Refresh rewards', 'Starting…', 'Scan running…', 'Offline · refresh disabled']]);
+        ['Check latest data', 'Starting…', 'Scan running…', 'Offline · refresh disabled']]);
       // An unscanned wallet's header has no last refresh and no loaded history; a scanned one keeps both.
       expect(textOf(control(false))).toBe('Scan wallet');
       expect(control(false)).not.toContain('aria-describedby');
-      expect(textOf(control(true, loaded))).toBe('Refresh rewards Last refresh Not completed Loaded 2026-09-11 → today · 42 days left to Aug 1 Load earlier history Loads 2026-09-04 → 2026-09-11');
+      expect(textOf(control(true, loaded))).toBe('Check latest data Last refresh Not completed Loaded 2026-09-11 → today');
+    });
+
+    it('asks for a key to scan a wallet never scanned, and to refresh one that was', () => {
+      const lead = (scanned: boolean) => textOf(/<p class="key-form-lead">[\s\S]*?<\/p>/.exec(renderToStaticMarkup(createElement(KeyForm, {
+        save: () => Promise.resolve(), close: () => undefined, scanned })))![0]);
+      expect(lead(false)).toBe('No provider configured. Enter a Helius API key to scan this wallet.');
+      expect(lead(true)).toBe('No provider configured. Enter a Helius API key to refresh rewards.');
     });
 
     it('reads Not scanned yet beside the short address until the wallet has saved coverage', () => {
@@ -1999,9 +2014,9 @@ describe('layered history on the dashboard', () => {
     });
 
     it('shows an unscanned wallet the same panel on every tab, with Scan wallet', () => {
-      expect(textOf(panel(false))).toBe(`${SHORT} has not been scanned yet. Scan wallet The first scan covers the last 7 days and takes a minute or two. `
+      expect(textOf(panel(false))).toBe(`${SHORT} has not been scanned yet. Scan wallet The first scan covers the last 7 days and takes a few minutes. `
         + 'Older history loads afterwards in 7-day batches.');
-      expect(UNSCANNED_NOTE).toBe('The first scan covers the last 7 days and takes a minute or two. Older history loads afterwards in 7-day batches.');
+      expect(UNSCANNED_NOTE).toBe('The first scan covers the last 7 days and takes a few minutes. Older history loads afterwards in 7-day batches.');
       expect(panel(false)).toMatch(/<button type="button" class="primary unscanned-button">Scan wallet<\/button>/);
       // While its first scan runs the button says so and starts nothing.
       expect(panel(true)).toMatch(/<button type="button" class="primary unscanned-button" disabled="">Scan running…<\/button>/);
@@ -2017,11 +2032,11 @@ describe('layered history on the dashboard', () => {
       expect(runningElsewhereText(WALLET)).toBe(`A scan is running for ${short(WALLET)}`);
       const loaded = loadedReport();
       const html = renderToStaticMarkup(createElement(RefreshControl, { health, running: false, busy: false, scanned: true, runningFor: WALLET,
-        lastRefresh: lastSyncText(loaded), history: historyStatus(loaded), onRefresh: () => undefined }));
-      expect(html).toMatch(/<button type="button" class="primary refresh-button" disabled="" aria-describedby="running-elsewhere last-refresh history-loaded">Refresh rewards<\/button>/);
-      expect(textOf(html)).toBe(`Refresh rewards A scan is running for ${short(WALLET)} Last refresh Not completed Loaded 2026-09-11 → today · 42 days left to Aug 1 Load earlier history Loads 2026-09-04 → 2026-09-11`);
-      // Load earlier is a job too, so it waits with the button.
-      expect(html).toContain('class="earlier-button" disabled=""><span class="button-label">Load earlier history');
+        lastRefresh: lastSyncText(loaded), history: historyStatus(loaded), onRefresh: () => undefined, onMore: () => undefined, moreText: scanMoreText(loaded) }));
+      expect(html).toMatch(/<button type="button" class="primary refresh-button" disabled="" aria-describedby="running-elsewhere last-refresh history-loaded">Check latest data<\/button>/);
+      expect(textOf(html)).toBe(`Check latest data Scan more 42 days left to Aug 1 A scan is running for ${short(WALLET)} Last refresh Not completed Loaded 2026-09-11 → today`);
+      // Scan more starts jobs too, so it waits with the button.
+      expect(html).toContain('class="more-button" disabled=""><span class="button-label">Scan more');
       const unscanned = renderToStaticMarkup(createElement(UnscannedPanel, { wallet: DEMO_WALLET, health, running: false, busy: false, runningFor: WALLET, onScan: () => undefined }));
       expect(unscanned).toMatch(/disabled="" aria-describedby="unscanned-elsewhere">Scan wallet<\/button><p class="running-elsewhere" id="unscanned-elsewhere">A scan is running for /);
     });
@@ -2070,9 +2085,11 @@ describe('layered history on the dashboard', () => {
     });
 
     it('a first scan: its seven days on the idle button, then the span, the day being read and the days done', () => {
-      expect(firstScanRangeText(DEMO_CUTOFF)).toBe('Scans 2026-09-14 → today (7 days)');
-      // Near the floor the first scan is clipped, and says how many days it covers.
-      expect(firstScanRangeText(HISTORY_FLOOR + 3.5 * 86400)).toBe('Scans 2026-08-01 → today (4 days)');
+      // No day count: seven days back from mid-day reach into an eighth calendar day, which a count contradicted.
+      expect(firstScanRangeText(DEMO_CUTOFF)).toBe('Scans 2026-09-14 → today');
+      expect(firstScanRangeText(DEMO_CUTOFF + 0.5)).toBe('Scans 2026-09-14 → today');
+      // Near the floor the first scan is clipped.
+      expect(firstScanRangeText(HISTORY_FLOOR + 3.5 * 86400)).toBe('Scans 2026-08-01 → today');
       const start = DEMO_CUTOFF - 7 * 86400;
       const first = job('refresh', planRanges(DEMO_CUTOFF, [], start), { kind: 'first', startTime: start, endTime: DEMO_CUTOFF });
       expect(runningRangeText(first, null)).toBe('Scanning 2026-09-14 → 2026-09-21');
@@ -2084,7 +2101,8 @@ describe('layered history on the dashboard', () => {
       // The idle button carries the first scan's days; offline it says only why it is disabled.
       const panel = (health: Health | null) => textOf(renderToStaticMarkup(createElement(UnscannedPanel, { wallet: DEMO_WALLET, health, running: false, busy: false,
         range: firstScanRangeText(DEMO_CUTOFF), onScan: () => undefined })));
-      expect(panel(null)).toContain('Scan wallet Scans 2026-09-14 → today (7 days)');
+      expect(panel(null)).toContain('Scan wallet Scans 2026-09-14 → today');
+      expect(panel(null)).not.toMatch(/\(\d+ days?\)/);
       expect(panel({ providerConfigured: false, configurationChecked: false, offline: true, activeWallets: [] })).not.toContain('Scans ');
     });
 
@@ -2095,7 +2113,7 @@ describe('layered history on the dashboard', () => {
       expect(refreshRangeText(gapped)).toBe('Checks 2026-09-19 14:13 UTC → now');
       const control = textOf(renderToStaticMarkup(createElement(RefreshControl, { health: null, running: false, busy: false, lastRefresh: 'never',
         range: refreshRangeText(report), onRefresh: () => undefined })));
-      expect(control).toBe('Refresh rewards Checks 2026-09-21 14:13 UTC → now Last refresh never');
+      expect(control).toBe('Check latest data Checks 2026-09-21 14:13 UTC → now Last refresh never');
       const cutoff = DEMO_CUTOFF + 6 * HOUR;
       const refresh = job('refresh', planRanges(cutoff, [LOADED], LOADED_FROM), null, { cutoff });
       // The planner rereads the minute before the last cutoff; the text starts at the cutoff, as the idle button said.
@@ -2113,7 +2131,7 @@ describe('layered history on the dashboard', () => {
     });
 
     it('a Load earlier batch: its days on the idle button, then the day it is on', () => {
-      expect(historyStatus(loadedReport()).earlier?.range).toBe('Loads 2026-09-04 → 2026-09-11');
+      expect(scanMoreBatches(loadedReport()).find(item => item.back === 1)?.label).toBe('2026-09-04 14:13 → 2026-09-11 14:13');
       const batch = { startTime: LOADED_FROM - 7 * 86400, endTime: LOADED_FROM };
       const earlier = job('earlier', planEarlier(batch, []), { kind: 'earlier', ...batch });
       expect(runningRangeText(earlier, LOADED_FROM)).toBe('Scanning 2026-09-04 → 2026-09-11');

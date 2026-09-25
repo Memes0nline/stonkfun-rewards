@@ -614,7 +614,7 @@ test('no tab, panel or popover reads not verified, with verified rows or without
 });
 
 test('dismiss and browser close leave the background scan running; reopening sees completion', async ({ page, context }) => {
-  await ready(page); await page.getByRole('button', { name: 'Refresh rewards' }).click();
+  await ready(page); await page.getByRole('button', { name: 'Check latest data' }).click();
   const dialog = page.getByRole('dialog'); await expect(dialog).toBeVisible();
   await expect(dialog.getByRole('button', { name: 'CANCEL SCAN' })).toBeVisible();
   await expect(dialog.getByText('Waiting for provider response — scan still active.')).toBeVisible({ timeout: 6000 });
@@ -629,12 +629,12 @@ test('dismiss and browser close leave the background scan running; reopening see
   await next.screenshot({ path: screenshot('progress-complete.png'), fullPage: true });
 });
 test('explicit Cancel pauses; Resume is explicit and keeps the job identity', async ({ page }) => {
-  await ready(page); await page.getByRole('button', { name: 'Refresh rewards' }).click();
+  await ready(page); await page.getByRole('button', { name: 'Check latest data' }).click();
   const dialog = page.getByRole('dialog'); await expect(dialog).toBeVisible();
   await dialog.getByRole('button', { name: 'CANCEL SCAN' }).click();
   await expect(dialog.getByRole('button', { name: 'RESUME', exact: true })).toBeVisible({ timeout: 10_000 });
   await dialog.getByRole('button', { name: 'DISMISS', exact: true }).click();
-  await page.getByRole('button', { name: 'Refresh rewards' }).click();
+  await page.getByRole('button', { name: 'Check latest data' }).click();
   await expect(dialog.getByRole('button', { name: 'RESUME', exact: true })).toBeVisible();
   await dialog.getByRole('button', { name: 'RESUME', exact: true }).click();
   await expect(dialog.getByText('COMPLETE', { exact: true })).toBeVisible({ timeout: 12_000 });
@@ -644,7 +644,7 @@ test('invalid wallet never dispatches a scan', async ({ page }) => {
   let scans = 0; page.on('request', request => { if (request.url().endsWith('/api/v1/scans')) scans++; });
   await ready(page); await expect(page.locator('.status-button .status-tag')).toHaveText('SYNTHETIC');
   await page.getByRole('textbox', { name: 'PUBLIC WALLET ADDRESS' }).fill('invalid-wallet');
-  await page.getByRole('button', { name: 'Refresh rewards' }).click();
+  await page.getByRole('button', { name: 'Check latest data' }).click();
   await expect(page.locator('.wallet-error')).toContainText('That is not a Solana address'); expect(scans).toBe(0);
 });
 test('paused failure displays saved work and resume guidance', async ({ page }) => {
@@ -666,14 +666,14 @@ test('paused failure displays saved work and resume guidance', async ({ page }) 
 });
 test('mobile progress remains usable', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 }); await ready(page);
-  await page.getByRole('button', { name: 'Refresh rewards' }).click();
+  await page.getByRole('button', { name: 'Check latest data' }).click();
   await expect(page.getByRole('dialog').getByText('WORKING')).toBeVisible();
   expect(await overflow(page)).toBeLessThanOrEqual(0);
   await page.screenshot({ path: screenshot('progress-mobile.png'), fullPage: true });
 });
 test('reduced motion keeps progress content and disables animation', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' }); await ready(page);
-  await page.getByRole('button', { name: 'Refresh rewards' }).click();
+  await page.getByRole('button', { name: 'Check latest data' }).click();
   const indicator = page.getByRole('dialog').locator('.working-indicator');
   await expect(indicator).toContainText('WORKING');
   expect(await indicator.evaluate(node => getComputedStyle(node, '::before').animationName)).toBe('none');
@@ -683,7 +683,7 @@ test('completed scan refreshes the report once', async ({ page }) => {
   let reports = 0;
   page.on('request', request => { if (request.url().endsWith(`/api/v1/wallets/${'8'.repeat(32)}/report`)) reports++; });
   await ready(page); await expect(page.locator('.status-button .status-tag')).toHaveText('SYNTHETIC');
-  await page.getByRole('button', { name: 'Refresh rewards' }).click();
+  await page.getByRole('button', { name: 'Check latest data' }).click();
   await expect(page.getByRole('dialog')).toBeVisible();
   const beforeCompletion = reports;
   await expect(page.locator('.status-button')).toContainText('COMPLETE', { timeout: 12_000 });

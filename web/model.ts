@@ -1,7 +1,7 @@
 import type { DashboardReport } from '../src/web/view.js';
 import type { DashboardJob } from '../src/web/service.js';
 import type { ScanProgress } from '../src/scanner/progress.js';
-import { CHECK_MAX_DAYS, EARLIER_BATCH_DAYS, FIRST_SCAN_DAYS, firstScanStart, HISTORY_FLOOR, mergeRanges, RANGE_OVERLAP_SECONDS } from '../src/scanner/ranges.js';
+import { EARLIER_BATCH_DAYS, earlierBatch, FIRST_SCAN_DAYS, firstScanStart, HISTORY_FLOOR, mergeRanges, RANGE_OVERLAP_SECONDS } from '../src/scanner/ranges.js';
 export const EMPTY_MESSAGE = 'No confirmed priced rewards yet.';
 export const short = (value: string) => `${value.slice(0, 5)}…${value.slice(-5)}`;
 export const noun = (count: number | null, word: string) => count === 1 ? word : `${word}s`;
@@ -90,7 +90,8 @@ export const dayNumber = (day: string) => Date.parse(`${day}T00:00:00Z`) / 86_40
 export const dayText = (value: number) => new Date(value * 86_400_000).toISOString().slice(0, 10);
 /** Whether a string names a real calendar day as YYYY-MM-DD. */
 export const isCalendarDay = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value) && Number.isFinite(dayNumber(value)) && dayText(dayNumber(value)) === value;
-/** The history floor as a day, and as the header's short date. */
+/** The history floor as a time, as a day, and as the header's short date. */
+export const HISTORY_FLOOR_TIME = HISTORY_FLOOR;
 export const FLOOR_DAY = utcDay(HISTORY_FLOOR);
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'June', 'July', 'Aug', 'Sept', 'Oct', 'Nov', 'Dec'];
 const floorDate = new Date(HISTORY_FLOOR * 1000);
@@ -102,19 +103,11 @@ function savedDaysIn(range: { startTime: number; endTime: number }, completed: r
   const seconds = completed.reduce((sum, item) => sum + Math.max(0, Math.min(item.endTime, range.endTime) - Math.max(item.startTime, range.startTime)), 0);
   return Math.min(Math.ceil((range.endTime - range.startTime) / 86400), Math.ceil(seconds / 86400));
 }
-/** What the header says about loaded history, and the Load earlier control it offers. At the floor: the full history and no
- * control. Otherwise the loaded range, the days left to the floor, and Load earlier history, or Continue loading with the days
- * already saved when the next batch was interrupted. */
-export function historyStatus(report: Pick<DashboardReport, 'history' | 'coverage'>) {
+/** What the header and Scan more say about loaded history: the loaded range from its oldest day, or the full history at the floor.
+ * The days left, and a batch an interruption left partly saved, are in Scan more. */
+export function historyStatus(report: Pick<DashboardReport, 'history'>) {
   const { history } = report;
-  if (!history.earlierRemaining || !history.nextBatch || !history.notLoadedYet) {
-    return { loaded: `Full history since ${FLOOR_DAY}`, left: null, earlier: null };
-  }
-  const saved = savedDaysIn(history.nextBatch, report.coverage.completed);
-  const range = `Loads ${spanText(history.nextBatch)}`;
-  return { loaded: `Loaded ${history.oldestLoadedDay} → today`, left: `${history.notLoadedYet.days.toLocaleString()} ${noun(history.notLoadedYet.days, 'day')} left to ${FLOOR_SHORT}`,
-    earlier: saved > 0 ? { label: 'Continue loading', note: `${saved} of ${history.nextBatch.days} ${noun(history.nextBatch.days, 'day')} saved`, range }
-      : { label: 'Load earlier history', note: null, range } };
+  return { loaded: history.earlierRemaining ? `Loaded ${history.oldestLoadedDay} → today` : `Full history since ${FLOOR_DAY}` };
 }
 /** A UTC span as the scan text prints it: its first day through the day of its last second, or, under a day, both times to
  * the minute. Callers add UTC where the line needs it. */
@@ -141,15 +134,12 @@ export function jobSpan(job: SpanJob, loadedFrom: number | null) {
   const source = pieces.length ? pieces : job.ranges;
   return source.length ? { startTime: Math.min(...source.map(item => item.startTime)), endTime: Math.max(...source.map(item => item.endTime)) } : null;
 }
-/** The idle Refresh rewards button's second line: from the earliest gap in the loaded range, or else the last cutoff, to now. */
+/** The idle Check latest data button's second line: from the earliest gap in the loaded range, or else the last cutoff, to now. */
 export const refreshRangeText = (report: Pick<DashboardReport, 'cutoff' | 'coverage'>) =>
   `Checks ${utc(Math.min(report.cutoff, ...report.coverage.gaps.map(gap => gap.startTime)))} → now`;
-/** The idle Scan wallet button's second line: the first scan's days, seven before now unless the floor clips them. */
-export function firstScanRangeText(nowSeconds: number) {
-  const start = firstScanStart(Math.floor(nowSeconds));
-  const days = Math.ceil((nowSeconds - start) / 86400);
-  return `Scans ${utcDay(start)} → today (${days} ${noun(days, 'day')})`;
-}
+/** The idle Scan wallet button's second line: the first scan's first day, seven days before now unless the floor clips it, to
+ * today. No day count: the first scan's seven days reach into an eighth calendar day. */
+export const firstScanRangeText = (nowSeconds: number) => `Scans ${utcDay(firstScanStart(Math.floor(nowSeconds)))} → today`;
 /** The running primary button's second line: the span its job reads. */
 export function runningRangeText(job: SpanJob, loadedFrom: number | null) {
   const span = jobSpan(job, loadedFrom);
@@ -223,8 +213,8 @@ export function batchLabel(batch: { startTime: number; endTime: number }) {
 /** How long a Load earlier batch usually takes: the last completed batch's days and run time, or a plain estimate before any. */
 export const batchTimeText = (history: LoadedHistory | null | undefined) => history?.lastBatch?.kind === 'earlier'
   ? `Last batch: ${history.lastBatch.days} ${noun(history.lastBatch.days, 'day')} in ${runTimeText(history.lastBatch.elapsedSeconds)}` : 'Usually a few minutes.';
-/** The period control's reason for a period that loading earlier history would make available. */
-export const LOAD_EARLIER_REASON = 'Load earlier history to enable';
+/** The period control's reason for a period that loading earlier history would make available; the period then opens Scan more. */
+export const SCAN_MORE_REASON = 'Scan more to enable';
 /** A job planning the whole first-scan range, seven days before its cutoff or from the floor, in one run: a new wallet's first scan. */
 export function isFirstScan(job: Pick<DashboardJob, 'cutoff' | 'ranges'>) {
   const ranges = [...job.ranges].sort((a, b) => a.startTime - b.startTime);
@@ -248,13 +238,13 @@ export interface Period { id: PeriodId; start: string; end: string; days: number
 const span = (id: PeriodId, start: string, end: string): Period => ({ id, start, end, days: dayNumber(end) - dayNumber(start) + 1 });
 export interface PeriodOption { id: PeriodId; label: string; period: Period; reason: string | null }
 /** The fixed periods end on the cutoff's UTC day. Each is offered once tracked history covers all its days, and until then
- * carries the reason it is disabled: Load earlier history when the days back to the floor would cover it, otherwise the days
- * it needs. ALL, from the first tracked day, always is. */
+ * carries the reason it is disabled: Scan more when the days back to the floor would cover it, otherwise the days it needs.
+ * ALL, from the first tracked day, always is. */
 export function periodOptions(report: DashboardReport): PeriodOption[] {
   const tracked = trackedDays(report);
   const reachable = report.history.earlierRemaining ? dayNumber(tracked.last) - dayNumber(FLOOR_DAY) + 1 : tracked.count;
   return [...FIXED_PERIODS.map(item => ({ id: item.id, label: item.label, period: span(item.id, dayText(dayNumber(tracked.last) - item.days + 1), tracked.last),
-    reason: item.days <= tracked.count ? null : item.days <= reachable ? LOAD_EARLIER_REASON : `needs ${item.days} days of tracked history` })),
+    reason: item.days <= tracked.count ? null : item.days <= reachable ? SCAN_MORE_REASON : `needs ${item.days} days of tracked history` })),
   { id: 'all', label: 'ALL', period: span('all', tracked.first, tracked.last), reason: null }];
 }
 /** A custom range names two real UTC days inside tracked history, the first on or before the second. */
@@ -281,7 +271,7 @@ export function resolvePeriod(report: DashboardReport, params: Readonly<Record<s
   }
   const option = periodOptions(report).find(item => item.id === params.period);
   if (option && option.reason === null) return { period: option.period, notice: null };
-  const reason = option?.reason === LOAD_EARLIER_REASON ? 'needs earlier history; load earlier history to enable it' : option?.reason ?? 'is not available';
+  const reason = option?.reason === SCAN_MORE_REASON ? 'needs earlier history; Scan more to enable it' : option?.reason ?? 'is not available';
   return { period: fallback, notice: `${option?.label ?? 'That period'} ${reason}; showing ${periodLabel(fallback)}.` };
 }
 /** A period's hash parameters: its id, and for a custom range its first and last day. */
@@ -724,18 +714,18 @@ export function walletInputError(value: string) {
   return null;
 }
 /** Whether the wallet in view has saved coverage: a report holding a completed day or a finished sync. A wallet the server does not
- * track, or whose first scan has not saved a day yet, has none, and the page offers Scan wallet instead of Refresh rewards. */
+ * track, or whose first scan has not saved a day yet, has none, and the page offers Scan wallet instead of Check latest data. */
 export const hasSavedCoverage = (report: Pick<DashboardReport, 'coverage' | 'lastSync'> | null) => report !== null
   && (report.coverage.completed.length > 0 || report.lastSync !== null);
 /** The primary button's action for the wallet in view. */
-export const primaryLabel = (scanned: boolean) => scanned ? 'Refresh rewards' : 'Scan wallet';
+export const primaryLabel = (scanned: boolean) => scanned ? 'Check latest data' : 'Scan wallet';
 export const NOT_SCANNED = 'Not scanned yet';
 /** The header status for the wallet in view: WORKING while its job runs here, Not scanned yet without saved coverage, and
  * otherwise its last job's state. */
 export const walletStatusText = (job: DashboardJob | null, scanned: boolean) => scanned || job?.runningLocally ? jobStateText(job) : NOT_SCANNED;
 /** The panel every tab shows for a wallet with no saved coverage. */
 export const unscannedTitle = (wallet: string) => `${short(wallet)} has not been scanned yet.`;
-export const UNSCANNED_NOTE = `The first scan covers the last ${FIRST_SCAN_DAYS} days and takes a minute or two. Older history loads afterwards in ${EARLIER_BATCH_DAYS}-day batches.`;
+export const UNSCANNED_NOTE = `The first scan covers the last ${FIRST_SCAN_DAYS} days and takes a few minutes. Older history loads afterwards in ${EARLIER_BATCH_DAYS}-day batches.`;
 /** Why the primary button waits while another wallet's job runs: the page starts one job at a time. */
 export const runningElsewhereText = (wallet: string) => `A scan is running for ${short(wallet)}`;
 /** The wallet whose job runs on this server while another is in view, or null. With no wallet in view nothing waits. */
@@ -753,10 +743,10 @@ export const jobKindText = (job: Pick<DashboardJob, 'kind' | 'batch'> & Partial<
   : job.kind === 'earlier' ? `Load earlier${job.batch ? ` · ${utcDay(job.batch.startTime)} → ${utcDay(job.batch.endTime - 1)}` : ''}` : 'Refresh';
 /** Whether the loaded range holds no StonkFun payout at all, verified or attributed, once the attributed tier is evaluated. */
 export const noPayouts = (report: DashboardReport) => attributionState(report) === 'evaluated' && (report.attribution.rows ?? 0) === 0 && report.counts.confirmed === 0;
-/** The overview's empty state for a loaded range with no payouts, and whether Load earlier can look further back. */
+/** The overview's empty state for a loaded range with no payouts, and whether Scan more can look further back. */
 export function emptyHistoryText(history: LoadedHistory) {
   return history.earlierRemaining
-    ? { title: `No StonkFun payouts found between ${history.oldestLoadedDay} and today.`, detail: `Days before ${history.oldestLoadedDay} are not loaded yet. Load earlier history to check them.`, earlier: true }
+    ? { title: `No StonkFun payouts found between ${history.oldestLoadedDay} and today.`, detail: `Days before ${history.oldestLoadedDay} are not loaded yet. Scan more to check them.`, earlier: true }
     : { title: `No StonkFun payouts found since ${FLOOR_DAY}.`, detail: 'Every day since then is loaded. Rows the scanner could not attribute are counted apart in Coverage.', earlier: false };
 }
 export function progressState(job: DashboardJob, now: number) {
@@ -778,37 +768,8 @@ export function loadedDays(report: Pick<DashboardReport, 'cutoff' | 'trackingSta
   const target = coverageTarget(report);
   return { first: utcDay(target.startTime), last: utcDay(Math.max(target.startTime, target.endTime - 1)) };
 }
-/** A Rescan dates choice: whole UTC days, first through last. */
+/** A check's days: whole UTC days, first through last. */
 export interface RescanPick { start: string; end: string }
-/** Rescan dates quick picks: every calendar week, Monday to Sunday UTC, holding a loaded day, newest first, each clipped to the
- * loaded days, so no pick is ever longer than seven days or outside the loaded range. */
-export function rescanWeeks(report: Pick<DashboardReport, 'cutoff' | 'trackingStart'>): RescanPick[] {
-  const { first, last } = loadedDays(report);
-  // Day 0, 1970-01-01, was a Thursday, so a day's distance back to its Monday is (day + 3) mod 7.
-  const weeks: RescanPick[] = [];
-  for (let monday = dayNumber(first) - (dayNumber(first) + 3) % 7; monday <= dayNumber(last); monday += 7) {
-    weeks.push({ start: dayText(Math.max(monday, dayNumber(first))), end: dayText(Math.min(monday + 6, dayNumber(last))) });
-  }
-  return weeks.reverse();
-}
-/** The quick pick holding `day`: its week, clipped to the loaded days. */
-export const weekOf = (report: Pick<DashboardReport, 'cutoff' | 'trackingStart'>, day: string): RescanPick =>
-  rescanWeeks(report).find(week => week.start <= day && day <= week.end) ?? { start: day, end: day };
-/** Why a Rescan dates choice cannot start, or null: two real UTC days, the first on or before the last, at most seven, all loaded. */
-export function rescanError(report: Pick<DashboardReport, 'cutoff' | 'trackingStart'>, start: string, end: string) {
-  if (!isCalendarDay(start) || !isCalendarDay(end)) return 'Enter both days as real UTC dates.';
-  if (start > end) return 'The start must be on or before the end.';
-  const days = dayNumber(end) - dayNumber(start) + 1;
-  if (days > CHECK_MAX_DAYS) return `Rescan at most ${CHECK_MAX_DAYS} days at a time; this is ${days}.`;
-  const loaded = loadedDays(report);
-  if (start < loaded.first || end > loaded.last) return `Rescan only loaded days, ${loaded.first} → ${loaded.last}.`;
-  return null;
-}
-/** The exact range a rescan will check, shown before it starts. */
-export function rescanSummary(start: string, end: string) {
-  const days = dayNumber(end) - dayNumber(start) + 1;
-  return `Rescan ${start} → ${end} (${days} ${noun(days, 'day')}). Checks these days again and adds anything missed. Payouts already saved are not counted twice.`;
-}
 /** A finished rescan's line: the attributed payouts it found in transactions not saved before, and those already saved in its
  * days. Verified payouts are named apart when there are any, never added in. A rescan whose every day agreed says the range is
  * now checked. Null until its checks are done. */
@@ -822,25 +783,65 @@ export function rescanDoneText(job: Partial<Pick<DashboardJob, 'check' | 'checkR
     .filter(Boolean).join(' ');
 }
 export const RANGE_CHECKED_TEXT = 'Every day in this range is now checked.';
-/** A Rescan dates week and how many of its loaded days are still to check: read once, or partly not loaded. */
-export interface RescanWeek extends RescanPick { toCheck: number }
-/** Rescan dates weeks, each newest first: To check holds every week with a day not checked yet; Already confirmed, every week
- * whose days are all Checked. */
-export function rescanSections(report: Pick<DashboardReport, 'cutoff' | 'trackingStart' | 'coverage'>) {
-  const unchecked = dayStates(report).filter(item => item.state !== 'checked').map(item => item.day);
-  const weeks: RescanWeek[] = rescanWeeks(report).map(week => ({ ...week, toCheck: unchecked.filter(day => week.start <= day && day <= week.end).length }));
-  return { toCheck: weeks.filter(week => week.toCheck > 0), confirmed: weeks.filter(week => week.toCheck === 0) };
-}
-/** A week's label in Rescan dates: its days still to check, or confirmed. */
-export const rescanWeekLabel = (week: RescanWeek) =>
-  `${week.start} → ${week.end} · ${week.toCheck > 0 ? `${week.toCheck.toLocaleString()} ${noun(week.toCheck, 'day')} to check` : 'confirmed'}`;
-export const ALL_CHECKED_TEXT = 'Every loaded day is checked.';
-export const NONE_CONFIRMED_TEXT = 'No week is fully checked yet.';
 /** The loaded days not checked yet: read once, or partly not loaded. */
 export const daysToCheck = (report: Pick<DashboardReport, 'cutoff' | 'trackingStart' | 'coverage'>) =>
   dayStates(report).filter(item => item.state !== 'checked').length;
-/** The header's Rescan dates button: with the days still to check while there are any, otherwise alone. */
-export const rescanButtonText = (toCheck: number) => toCheck > 0 ? `Rescan dates · ${toCheck.toLocaleString()} ${noun(toCheck, 'day')} to check` : 'Rescan dates';
+export const ALL_CAUGHT_UP_TEXT = 'All caught up';
+/** One row of Scan more: a batch of at most seven days. A batch not loaded is exactly the span Load earlier reads, counting back in
+ * 7-day steps from the oldest loaded time and stopping at the floor; `back` is how many batches Load reads to reach it, 1 for the
+ * next. Loaded days are split on the same 7-day steps from the oldest loaded day, as whole UTC days, since a check reads whole
+ * days: their span is those days clipped to the loaded range, and `toCheck` counts the days read once or partly not loaded. */
+export interface MoreBatch {
+  startTime: number; endTime: number; first: string; last: string; days: number; label: string;
+  status: 'not_loaded' | 'loaded' | 'checked'; toCheck: number; back: number; saved: number;
+}
+/** A batch edge as a row prints it: a day at midnight (the day before, for an end), otherwise its day and UTC minute. */
+const edgeText = (seconds: number, end: boolean) => seconds % 86400 === 0 ? utcDay(end ? seconds - 1 : seconds)
+  : new Date(seconds * 1000).toISOString().slice(0, 16).replace('T', ' ');
+/** A batch's UTC dates, with the minute wherever an edge falls inside a day, so two rows never seem to share a day. */
+export const batchDates = (span: { startTime: number; endTime: number }) => `${edgeText(span.startTime, false)} → ${edgeText(span.endTime, true)}`;
+/** Every Scan more row from today back to the floor, newest first, none overlapping and none before the floor. */
+export function scanMoreBatches(report: Pick<DashboardReport, 'cutoff' | 'trackingStart' | 'coverage' | 'history'>): MoreBatch[] {
+  const loadedFrom = coverageTarget(report).startTime;
+  const states = new Map(dayStates(report).map(item => [item.day, item.state]));
+  const { first, last } = loadedDays(report);
+  const loaded: MoreBatch[] = [];
+  for (let day = dayNumber(first); day <= dayNumber(last); day += EARLIER_BATCH_DAYS) {
+    const end = Math.min(day + EARLIER_BATCH_DAYS - 1, dayNumber(last));
+    const days = Array.from({ length: end - day + 1 }, (_, index) => dayText(day + index));
+    const toCheck = days.filter(item => states.get(item) !== 'checked').length;
+    const span = { startTime: Math.max(loadedFrom, day * 86400), endTime: Math.min(report.cutoff, (end + 1) * 86400) };
+    loaded.push({ ...span, first: dayText(day), last: dayText(end), days: days.length, label: batchDates(span), status: toCheck > 0 ? 'loaded' : 'checked', toCheck, back: 0, saved: 0 });
+  }
+  const earlier: MoreBatch[] = [];
+  for (let batch = earlierBatch(loadedFrom); batch; batch = earlierBatch(batch.startTime)) {
+    earlier.push({ ...batch, first: utcDay(batch.startTime), last: utcDay(batch.endTime - 1), days: Math.ceil((batch.endTime - batch.startTime) / 86400), label: batchDates(batch),
+      status: 'not_loaded', toCheck: 0, back: earlier.length + 1, saved: savedDaysIn(batch, report.coverage.completed) });
+  }
+  return [...loaded.reverse(), ...earlier];
+}
+/** The row holding a time, which Scan more highlights when another place opened it. */
+export const batchAt = (batches: readonly MoreBatch[], time: number | null) => time === null ? null
+  : batches.find(batch => batch.startTime <= time && time < batch.endTime) ?? null;
+/** A row's status: not loaded (with the days an interrupted batch saved), loaded, or checked. */
+export const batchStatusText = (batch: MoreBatch) => batch.status === 'checked' ? 'Checked' : batch.status === 'loaded' ? 'Loaded'
+  : batch.saved > 0 ? `Not loaded · ${batch.saved} of ${batch.days} ${noun(batch.days, 'day')} saved` : 'Not loaded';
+/** A row's one action: Load, Check with its days still to check, or Confirmed, which is not clickable. */
+export const batchActionText = (batch: MoreBatch) => batch.status === 'not_loaded' ? 'Load'
+  : batch.status === 'loaded' ? `Check · ${batch.toCheck.toLocaleString()} ${noun(batch.toCheck, 'day')}` : 'Confirmed';
+/** Scan more's Load reads several batches one after another; the scan dialog names the one running. */
+export const sequenceText = (sequence: { index: number; total: number }) => `Batch ${sequence.index} of ${sequence.total}`;
+/** The Scan more button's second line: the days left to the floor while earlier history remains, otherwise the loaded days still to
+ * check while there are any, otherwise all caught up. */
+export function scanMoreText(report: Pick<DashboardReport, 'cutoff' | 'trackingStart' | 'coverage' | 'history'>) {
+  const left = report.history.earlierRemaining ? report.history.notLoadedYet?.days ?? 0 : 0;
+  if (left > 0) return `${left.toLocaleString()} ${noun(left, 'day')} left to ${FLOOR_SHORT}`;
+  const toCheck = daysToCheck(report);
+  return toCheck > 0 ? `${toCheck.toLocaleString()} ${noun(toCheck, 'day')} to check` : ALL_CAUGHT_UP_TEXT;
+}
+/** The one summary line at the top of Scan more: the loaded range with the Scan more button's second line. */
+export const scanMoreSummary = (report: Pick<DashboardReport, 'cutoff' | 'trackingStart' | 'coverage' | 'history'>) =>
+  `${historyStatus(report).loaded} · ${scanMoreText(report)}`;
 export type DayState = 'checked' | 'read_once' | 'gap';
 export const DAY_STATE_TEXT: Record<DayState, string> = { checked: 'Checked', read_once: 'Read once', gap: 'Gap' };
 /** Every loaded UTC day, newest first: Checked when all of its loaded time agreed with a second listing, Read once when it was

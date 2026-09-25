@@ -4,7 +4,7 @@ import type { DashboardReport } from '../src/web/view.js';
 import { PeriodHero } from './Hero.js';
 import {
   ATTRIBUTION_STATES, attributedChartDays, attributionState, attributionStateDetail, chartDays, chartTicks, customPeriod, dayNumber, daySegments, dayText, defaultPeriod,
-  EMPTY_MESSAGE, noun, OTHER_COLOR, percentText, periodLabel, periodOptions, periodParams, sortUsdRows, tickText, TOKEN_COLORS, tokenColor, tokenPalette, tokenRanking,
+  EMPTY_MESSAGE, HISTORY_FLOOR_TIME, noun, OTHER_COLOR, percentText, periodLabel, periodOptions, periodParams, SCAN_MORE_REASON, sortUsdRows, tickText, TOKEN_COLORS, tokenColor, tokenPalette, tokenRanking,
   tokenSymbol, trackedDays, usd, usdExact, verifiedHidden,
 } from './model.js';
 import type { DayBucket, Period, Segment, SortDirection, TokenPalette } from './model.js';
@@ -418,8 +418,11 @@ function VerifiedPlot({ report, period }: { report: DashboardReport; period: Per
 }
 
 /** The period control: each fixed period, disabled with its reason until tracked history covers it; ALL; and a custom range of
- * two UTC days inside tracked history. A valid choice goes straight to the hash; an invalid range shows why and changes nothing. */
-export function PeriodControl({ report, period, onPeriod }: { report: DashboardReport; period: Period; onPeriod: (params: Record<string, string>) => void }) {
+ * two UTC days inside tracked history. A valid choice goes straight to the hash; an invalid range shows why and changes nothing.
+ * A period that earlier history would enable opens Scan more on the batch holding its first day, when `onMore` is given. */
+export function PeriodControl({ report, period, onPeriod, onMore = null }: {
+  report: DashboardReport; period: Period; onPeriod: (params: Record<string, string>) => void; onMore?: ((focus: number) => void) | null;
+}) {
   const tracked = trackedDays(report);
   const [draft, setDraft] = useState({ from: period.start, to: period.end });
   const [error, setError] = useState<string | null>(null);
@@ -435,11 +438,18 @@ export function PeriodControl({ report, period, onPeriod }: { report: DashboardR
   };
   return <div className="period-control">
     <div className="segments period-segments" role="group" aria-label="Period">
-      {periodOptions(report).map(option => <span key={option.id} className="period-option">
-        <button type="button" aria-pressed={period.id === option.id} aria-disabled={option.reason ? true : undefined}
-          aria-describedby={option.reason ? `period-reason-${option.id}` : undefined} onClick={() => { if (!option.reason) onPeriod({ period: option.id }); }}>{option.label}</button>
-        {option.reason ? <span className="period-tip" role="tooltip" id={`period-reason-${option.id}`}>{option.reason}</span> : null}
-      </span>)}
+      {periodOptions(report).map(option => {
+        // A period that earlier history would enable is not disabled when it can open Scan more: that is what it does.
+        const more = option.reason === SCAN_MORE_REASON && onMore ? onMore : null;
+        return <span key={option.id} className="period-option">
+          <button type="button" className={more ? 'needs-more' : undefined} aria-pressed={period.id === option.id} aria-disabled={option.reason && !more ? true : undefined}
+            aria-describedby={option.reason ? `period-reason-${option.id}` : undefined} onClick={() => {
+              if (!option.reason) onPeriod({ period: option.id });
+              else if (more) more(Math.max(HISTORY_FLOOR_TIME, dayNumber(option.period.start) * 86400));
+            }}>{option.label}</button>
+          {option.reason ? <span className="period-tip" role="tooltip" id={`period-reason-${option.id}`}>{option.reason}</span> : null}
+        </span>;
+      })}
       <span className="period-option"><button type="button" aria-pressed={period.id === 'custom'} onClick={() => { edit({ from: period.start, to: period.end }); }}>CUSTOM</button></span>
     </div>
     {period.id === 'custom' || error ? <div className="custom-range" role="group" aria-label="Custom UTC range">
@@ -455,13 +465,14 @@ export function PeriodControl({ report, period, onPeriod }: { report: DashboardR
 /** One panel for the selected period: the attributed figures and the period control lead, the attributed chart and the period's
  * token ranking follow, and verified comes last on its own scale, left out while it has no rows. The two groups are never stacked
  * or summed. */
-export function Chart({ report, period = defaultPeriod(report), notice = null, palette, onPeriod = () => undefined, onDay = () => undefined, onTokenPayouts = () => undefined }: {
+export function Chart({ report, period = defaultPeriod(report), notice = null, palette, onPeriod = () => undefined, onDay = () => undefined, onTokenPayouts = () => undefined,
+  onMore = null }: {
   report: DashboardReport; period?: Period; notice?: string | null; palette?: TokenPalette; onPeriod?: (params: Record<string, string>) => void;
-  onDay?: (day: string, token?: string) => void; onTokenPayouts?: (token: string) => void;
+  onDay?: (day: string, token?: string) => void; onTokenPayouts?: (token: string) => void; onMore?: ((focus: number) => void) | null;
 }) {
   const colors = palette ?? tokenPalette(report, period);
   return <section className="panel chart-panel period-panel" aria-label="Reward summary">
-    <div className="period-head"><PeriodHero report={report} period={period}/><PeriodControl report={report} period={period} onPeriod={onPeriod}/></div>
+    <div className="period-head"><PeriodHero report={report} period={period}/><PeriodControl report={report} period={period} onPeriod={onPeriod} onMore={onMore}/></div>
     {notice ? <p className="period-notice" role="status">{notice}</p> : null}
     <AttributedPlot report={report} period={period} palette={colors} onDay={onDay}/>
     <TokenRanking report={report} period={period} palette={colors} onToken={onTokenPayouts}/>

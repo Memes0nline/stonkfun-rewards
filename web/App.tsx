@@ -2,10 +2,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { DashboardReport, LaunchSources } from '../src/web/view.js';
 import type { DashboardJob } from '../src/web/service.js';
 import { Coverage } from './Coverage.js';
-import { daysToCheck, EMPTY_PALETTE, firstScanRangeText, hasSavedCoverage, utcDay, historyStatus, lastSyncText, parseReceiptSort, PERIOD_PARAMS, primaryLabel, receiptSortParam, refreshRangeText, rescanButtonText,
-  resolvePeriod, runningElsewhere, runningRangeText, short, SOURCES_TIMEOUT_MS, tokenPalette, walletInputError } from './model.js';
+import { EMPTY_PALETTE, firstScanRangeText, hasSavedCoverage, utcDay, historyStatus, lastSyncText, parseReceiptSort, PERIOD_PARAMS, primaryLabel, receiptSortParam, refreshRangeText,
+  resolvePeriod, runningElsewhere, runningRangeText, scanMoreText, short, SOURCES_TIMEOUT_MS, tokenPalette, walletInputError } from './model.js';
 import type { Health, ReceiptFilters, RescanPick, TabId } from './model.js';
-import { RescanDialog } from './Rescan.js';
+import { ScanMoreDialog } from './ScanMore.js';
 import { Overview } from './Overview.js';
 import { EvidenceModal, PayoutsTab } from './Payouts.js';
 import { Progress } from './Progress.js';
@@ -26,8 +26,8 @@ const messages: Record<string, string> = {
   earlier_history_at_floor: 'History is already loaded back to the floor; there is nothing earlier to load.',
   wallet_not_loaded: 'Nothing is loaded for this wallet yet. Scan the wallet first, then load earlier history.',
   check_range_invalid: 'Choose a start day and an end day, the start on or before the end.',
-  check_range_too_long: 'Rescan at most 7 days at a time.',
-  check_range_outside_loaded: 'Rescan only days inside the loaded history.',
+  check_range_too_long: 'Check at most 7 days at a time.',
+  check_range_outside_loaded: 'Check only days inside the loaded history.',
 };
 const keyMessages: Record<string, string> = {
   invalid_request: 'The local server did not accept that key. Enter it exactly as Helius shows it.',
@@ -48,6 +48,8 @@ const stoppedKey = (job: DashboardJob | null) => job && !job.runningLocally && (
 function remembered() { try { return localStorage.getItem('stonkfun:last-wallet:v1') ?? ''; } catch { return ''; } }
 function remember(wallet: string) { try { localStorage.setItem('stonkfun:last-wallet:v1', wallet); } catch { /* optional local preference */ } }
 
+/** A Scan more Load in progress: the wallet, the batch running now and how many it reads, and that batch's job once started. */
+interface Sequence { wallet: string; index: number; total: number; jobId: string | null }
 /** Adds a wallet to the saved list, in the server's address order. */
 const withWallet = (wallets: string[], wallet: string) => wallets.includes(wallet) ? wallets : [...wallets, wallet].sort();
 
@@ -69,8 +71,15 @@ export function App() {
   // The wallet box, focused on a first launch with no saved wallet.
   const box = useRef<HTMLInputElement>(null);
   const [route, navigate] = useRoute();
-  // Rescan dates: closed, or open with the week it was opened on (null for the newest week).
-  const [rescan, setRescan] = useState<{ pick: RescanPick | null } | null>(null);
+  // Scan more: closed, or open with the time whose row it highlights (null from the header, which highlights none).
+  const [more, setMore] = useState<{ focus: number | null } | null>(null);
+  // Scan more's Load: the batches still to read back to the chosen row, one after another. `index` is the batch running now,
+  // 1-based, and `jobId` its job. Cancelling, or starting any other job, ends it; every completed batch stays saved.
+  const sequence = useRef<Sequence | null>(null);
+  const [shownSequence, setShownSequence] = useState<Sequence | null>(null);
+  const updateSequence = useCallback((next: Sequence | null) => { sequence.current = next; setShownSequence(next); }, []);
+  // The job whose completion last started the next batch, so a repeated poll of it starts nothing more.
+  const advanced = useRef<string | null>(null);
   // One receipt's evidence, opened from the Payouts list or a token drawer's receipts.
   const [evidence, setEvidence] = useState<string | null>(null);
   // Likely source launches for the wallet on screen. The launches of the wallet already shown stay on screen while a reload runs.
@@ -121,7 +130,7 @@ export function App() {
     setInputError('');
     // Filters and the period in the hash belong to the wallet on screen; a shared link's survive only the first load.
     if (selected.current && selected.current !== target) { overviewPeriod.current = {}; navigate(current => ({ tab: current.tab, params: {} }), { replace: true }); }
-    selected.current = target; setInput(target); setWallet(target); setLoaded(''); setError(''); setReport(null); setJob(null); setEvidence(null);
+    selected.current = target; setInput(target); setWallet(target); setLoaded(''); setError(''); setReport(null); setJob(null); setEvidence(null); updateSequence(null);
     try {
       const nextJob = await api<DashboardJob | null>(`/wallets/${target}/job`);
       // A wallet the server does not track has no report: it has not been scanned yet, which is not an error.
@@ -134,7 +143,7 @@ export function App() {
         if (hasSavedCoverage(nextReport)) setWallets(previous => withWallet(previous, target));
       }
     } catch (cause) { if (selected.current === target) setError((cause as Error).message); }
-  }, [navigate]);
+  }, [navigate, updateSequence]);
   /** Switches the view to a well-formed address pasted, typed or submitted in the wallet box. */
   const choose = (value: string) => { const target = value.trim(); if (target !== selected.current && !walletInputError(target)) void load(target); };
   useEffect(() => {
@@ -174,7 +183,7 @@ export function App() {
     timer = setTimeout(() => { void poll(); }, 2000);
     return () => { alive = false; clearTimeout(timer); };
   }, [wallet]);
-  /** The primary button: Scan wallet or Refresh rewards for the wallet in view. An address in the box that could not become the
+  /** The primary button: Scan wallet or Check latest data for the wallet in view. An address in the box that could not become the
    * view is explained under the box instead, and starts nothing. */
   function primary() {
     const typed = input.trim();
@@ -188,7 +197,7 @@ export function App() {
   /** Starts the first scan or a refresh of `target`, the wallet in view, and opens its progress. The wallet joins the saved list
    * once its report has saved coverage. */
   async function scan(target: string) {
-    setInputError(''); setKeySaved(false);
+    setInputError(''); setKeySaved(false); updateSequence(null);
     // A provider already found missing opens the key form at once; otherwise the server finds out when the scan starts.
     if (health?.configurationChecked && !health.providerConfigured) { setKeyRejected(false); setKeyForm(true); return; }
     setBusy(true); setError('');
@@ -203,39 +212,54 @@ export function App() {
       } else setError((cause as Error).message);
     } finally { setBusy(false); }
   }
-  /** Starts the next Load earlier batch for the wallet on screen and opens its progress. An interrupted batch that can resume is
-   * resumed, so its saved days are kept; otherwise the server plans the batch's missing days again. */
-  async function loadEarlier() {
+  /** Starts the next Load earlier batch for the wallet on screen and opens its progress, unless `open` is false, as for the next
+   * batch of a sequence, which `next` moves on to. An interrupted batch that can resume is resumed, so its saved days are kept;
+   * otherwise the server plans the batch's missing days again. */
+  async function loadEarlier(open = true, next = false) {
     const target = wallet;
     if (!target) return;
-    if (health?.configurationChecked && !health.providerConfigured) { setKeyRejected(false); setKeyForm(true); return; }
-    setBusy(true); setError(''); setKeySaved(false);
+    if (health?.configurationChecked && !health.providerConfigured) { updateSequence(null); setKeyRejected(false); setKeyForm(true); return; }
+    setMore(null); setBusy(true); setError(''); setKeySaved(false);
     try {
       let result = await api<DashboardJob>('/scans', { wallet: target, kind: 'earlier' });
       if (result.kind === 'earlier' && !result.runningLocally && result.canResume) result = await api<DashboardJob>(`/jobs/${result.id}/resume`, {});
-      if (selected.current === target) { setJob(result); setModal(true); }
+      if (sequence.current?.wallet === target) updateSequence({ ...sequence.current, index: sequence.current.index + (next ? 1 : 0), jobId: result.id });
+      if (selected.current === target) { setJob(result); if (open) setModal(true); }
       // Other wallets' buttons wait for this job at once, not at the next poll.
       void api<Health>('/health').then(setHealth).catch(() => undefined);
     } catch (cause) {
+      updateSequence(null);
       if (cause instanceof ApiError && cause.code === 'provider_not_configured') {
         setKeyRejected(false); setKeyForm(true); void api<Health>('/health').then(setHealth).catch(() => undefined);
       } else setError((cause as Error).message);
     } finally { setBusy(false); }
   }
-  /** Starts a rescan of the chosen days for the wallet on screen and opens its progress: each day is listed again and anything
-   * missing is fetched and saved. */
-  async function startRescan(pick: RescanPick) {
+  /** Scan more's Load: reads `total` batches back from the oldest loaded day, one after another, the first now. */
+  function loadBack(total: number) {
+    updateSequence({ wallet, index: 1, total, jobId: null });
+    void loadEarlier();
+  }
+  // Each batch of a sequence that completes starts the next; a batch that stops otherwise waits for Retry or ends the sequence.
+  useEffect(() => {
+    const current = sequence.current;
+    if (!current || !job || job.id !== current.jobId || job.runningLocally || job.status !== 'complete' || current.index >= current.total) return;
+    if (advanced.current === job.id) return;
+    advanced.current = job.id;
+    void loadEarlier(false, true);
+  }, [job]);
+  /** Starts a check of the chosen loaded days for the wallet on screen and opens its progress: each day is listed again and
+   * anything missing is fetched and saved. */
+  async function startCheck(pick: RescanPick) {
     const target = wallet;
     if (!target) return;
-    if (health?.configurationChecked && !health.providerConfigured) { setRescan(null); setKeyRejected(false); setKeyForm(true); return; }
+    setMore(null); updateSequence(null);
+    if (health?.configurationChecked && !health.providerConfigured) { setKeyRejected(false); setKeyForm(true); return; }
     setBusy(true); setError(''); setKeySaved(false);
     try {
       const result = await api<DashboardJob>('/scans', { wallet: target, kind: 'check', startDay: pick.start, endDay: pick.end });
-      setRescan(null);
       if (selected.current === target) { setJob(result); setModal(true); }
       void api<Health>('/health').then(setHealth).catch(() => undefined);
     } catch (cause) {
-      setRescan(null);
       if (cause instanceof ApiError && cause.code === 'provider_not_configured') {
         setKeyRejected(false); setKeyForm(true); void api<Health>('/health').then(setHealth).catch(() => undefined);
       } else setError((cause as Error).message);
@@ -252,11 +276,11 @@ export function App() {
     if (!job) return;
     if (job.canResume) void jobAction('resume');
     else if (job.kind === 'earlier') void loadEarlier();
-    else if (job.kind === 'check' && job.check) void startRescan({ start: utcDay(job.check.startTime), end: utcDay(job.check.endTime - 1) });
+    else if (job.kind === 'check' && job.check) void startCheck({ start: utcDay(job.check.startTime), end: utcDay(job.check.endTime - 1) });
     else void scan(job.wallet);
   }
   const running = (job?.runningLocally ?? false) || (!!wallet && (health?.activeWallets.includes(wallet) ?? false));
-  // Saved coverage decides Scan wallet or Refresh rewards. It is known once the wallet in view has been read; until then the
+  // Saved coverage decides Scan wallet or Check latest data. It is known once the wallet in view has been read; until then the
   // primary button waits.
   const reading = !!wallet && loaded !== wallet;
   const scanned = !reading && hasSavedCoverage(report?.wallet === wallet ? report : null);
@@ -265,6 +289,8 @@ export function App() {
   const runningFor = runningElsewhere(health, wallet);
   async function jobAction(kind: 'resume' | 'cancel') {
     if (!job) return;
+    // Cancelling ends a Load sequence; the batches it completed stay saved.
+    if (kind === 'cancel') updateSequence(null);
     const target = wallet;
     try { const result = await api<DashboardJob>(`/jobs/${job.id}/${kind}`, {}); if (selected.current === target) { setJob(result); setError(''); } }
     catch (cause) { setError((cause as Error).message); }
@@ -289,16 +315,17 @@ export function App() {
       onDay={(day, token) => { navigate({ tab: 'payouts', params: token ? { day, token } : { day } }); }}
       // Payouts has no date-range filter, so a ranked token opens all its payouts, highest USD first.
       onTokenPayouts={token => { navigate({ tab: 'payouts', params: { token, sort: 'usd-desc' } }); }}
-      onEarlier={() => { void loadEarlier(); }} canEarlier={!busy && !running && !runningFor && !health?.offline}/>
+      onMore={focus => { setMore({ focus }); }} canMore={canStart}/>
     : route.tab === 'tokens' ? <TokensTab report={current} selected={route.params.token} palette={palette} open={token => { navigate({ tab: 'tokens', params: { token } }); }}
       close={() => { navigate({ tab: 'tokens', params: {} }); }} onReceipt={setEvidence} launchSources={sources.wallet === wallet ? sources : { status: 'idle', data: null }} loadSources={loadSources}/>
       : route.tab === 'payouts' ? <PayoutsTab report={current} openReceipt={setEvidence} palette={palette} filters={payoutFilters} sort={parseReceiptSort(route.params.sort)}
         setFilters={next => { payouts(next, route.params.sort); }} setSort={next => { payouts(payoutFilters, receiptSortParam(next)); }}/>
         : route.tab === 'trust' ? <Trust report={current}/>
           : <Coverage report={current} reclassify={() => { void reclassify(); }} canReclassify={!busy && !health?.offline && !health?.activeWallets.length}
-            onEarlier={() => { void loadEarlier(); }} canEarlier={!busy && !running && !runningFor && !health?.offline}
-            onRescan={pick => { setRescan({ pick }); }} canRescan={!busy && !running && !runningFor && !health?.offline}/>;
+            onMore={focus => { setMore({ focus }); }} canMore={canStart}/>;
   const history = scanned && report ? historyStatus(report) : null;
+  // Scan more and the places that open it wait while any job runs here, a start is in flight, or the server is offline.
+  const canStart = !busy && !running && !runningFor && !health?.offline;
   // The primary button's second line: the span the running job reads, or the time the next scan would read.
   const shownReport = report?.wallet === wallet ? report : null;
   const range = running ? (job?.wallet === wallet && job.runningLocally ? runningRangeText(job, shownReport?.history.loadedFrom ?? null) : null)
@@ -315,9 +342,8 @@ export function App() {
       <select aria-label="Saved wallets" value={wallets.includes(wallet) ? wallet : ''} onChange={event => { if (event.target.value) void load(event.target.value); }}><option value="">Saved wallets</option>{wallets.map(saved => <option key={saved} value={saved}>{short(saved)}</option>)}</select>
     </form>
     <RefreshControl health={health} running={running} busy={busy || reading} scanned={scanned} runningFor={runningFor} lastRefresh={report ? lastSyncText(report) : 'never'} history={history} range={range}
-      onRefresh={primary} onEarlier={() => { void loadEarlier(); }} onRescan={() => { setRescan({ pick: null }); }}
-      rescanText={rescanButtonText(scanned && shownReport ? daysToCheck(shownReport) : 0)}>
-      {keyForm ? <KeyForm save={saveKey} close={closeKeyForm} rejected={keyRejected}/>
+      onRefresh={primary} onMore={() => { setMore({ focus: null }); }} moreText={scanned && shownReport ? scanMoreText(shownReport) : null}>
+      {keyForm ? <KeyForm save={saveKey} close={closeKeyForm} rejected={keyRejected} scanned={scanned}/>
         : keySaved ? <span className="refresh-note" role="status">Provider configured. {primaryLabel(scanned)} when ready.</span> : null}
     </RefreshControl>
     <StatusMenu report={report} health={health} job={job} now={now} wallet={wallet} scanned={!unscanned} openProgress={() => { setModal(true); }}
@@ -337,9 +363,10 @@ export function App() {
         <p className="muted">No wallet connection. No signature. No automatic scans.</p></div>}
       <footer><span>STONKFUN REWARDS <span className="muted">/ LOCAL SCANNER</span></span><span>PUBLIC ADDRESSES. EXACT AMOUNTS. VISIBLE UNCERTAINTY.</span></footer>
     </main>{modal && job ? <Progress job={job} now={now} report={report?.wallet === job.wallet ? report : null} close={() => { setModal(false); }} action={kind => { void jobAction(kind); }}
+      sequence={shownSequence && shownSequence.wallet === job.wallet && job.kind === 'earlier' ? shownSequence : null}
       onRetry={retry} onKey={() => { setModal(false); setKeySaved(false); setKeyRejected(true); setKeyForm(true); }}/> : null}
-    {rescan && scanned && report ? <RescanDialog report={report} initial={rescan.pick} busy={busy} onStart={pick => { void startRescan(pick); }}
-      onClose={() => { setRescan(null); }}/> : null}
+    {more && scanned && report ? <ScanMoreDialog report={report} focus={more.focus} busy={!canStart} onLoad={loadBack}
+      onCheck={pick => { void startCheck(pick); }} onClose={() => { setMore(null); }}/> : null}
     {report && evidence ? (() => { const receipt = report.attribution.receipts?.find(item => item.id === evidence);
       return receipt ? <EvidenceModal key={receipt.id} report={report} receipt={receipt} onClose={() => { setEvidence(null); }}/> : null; })() : null}</>;
 }

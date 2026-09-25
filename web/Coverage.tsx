@@ -1,18 +1,17 @@
 import type { DashboardReport } from '../src/web/view.js';
 import { EARLIER_BATCH_DAYS } from '../src/scanner/ranges.js';
-import { attributedCount, attributionState, coverageTarget, DAY_STATE_TEXT, dayStates, FLOOR_DAY, historyStatus, isAddress, noun, REASON_TEXT, reasonLabel, short, utc, weekOf } from './model.js';
-import type { RescanPick } from './model.js';
-import { EarlierButton } from './Refresh.js';
+import { attributedCount, attributionState, coverageTarget, DAY_STATE_TEXT, dayNumber, dayStates, FLOOR_DAY, isAddress, noun, REASON_TEXT, reasonLabel, short, utc } from './model.js';
+import { ScanMoreButton } from './Refresh.js';
 import { Address } from './Sheet.js';
 
 const mintCell = (mint: string | null) => isAddress(mint) ? <Address value={mint} label="mint address" link={`https://solscan.io/token/${mint}`}/>
   : <span className="muted">{mint === null ? 'Unresolved mint' : mint}</span>;
 
-/** Retrieval and classification: counts by status, ranges and gaps, each loaded day as Checked or Read once, unknown reasons in
- * plain words, the bounded samples. A day read once offers Rescan to double-check, which opens Rescan dates on its week. */
-export function Coverage({ report, reclassify, canReclassify, onEarlier = () => undefined, canEarlier = false, onRescan = () => undefined, canRescan = false }: {
-  report: DashboardReport; reclassify: () => void; canReclassify: boolean; onEarlier?: () => void; canEarlier?: boolean;
-  onRescan?: (pick: RescanPick) => void; canRescan?: boolean;
+/** Retrieval and classification: counts by status, ranges and gaps, each loaded day as Checked, Read once or Gap, unknown reasons
+ * in plain words, the bounded samples. The days not loaded yet, and each loaded day not checked yet, offer Scan more, which opens
+ * the Scan more list with the row holding them highlighted; `onMore` takes a time inside that row. */
+export function Coverage({ report, reclassify, canReclassify, onMore = () => undefined, canMore = false }: {
+  report: DashboardReport; reclassify: () => void; canReclassify: boolean; onMore?: (focus: number) => void; canMore?: boolean;
 }) {
   // One block per status, each under the report's own group label where the report has one; nothing here is added up.
   // An unevaluated attributed tier reads as its state alone, never as a count.
@@ -27,9 +26,9 @@ export function Coverage({ report, reclassify, canReclassify, onEarlier = () => 
   const target = coverageTarget(report);
   const ranges = [...report.coverage.completed.map(range => ({ ...range, gap: false })), ...report.coverage.gaps.map(range => ({ ...range, gap: true }))]
     .sort((a, b) => b.startTime - a.startTime);
-  // The days from the floor to the oldest loaded day wait for Load earlier: listed last, oldest, and never as a gap.
+  // The days from the floor to the oldest loaded day wait for Scan more: listed last, oldest, and never as a gap.
   const notLoaded = report.history.notLoadedYet;
-  const earlier = historyStatus(report).earlier;
+  const loadedFrom = report.history.loadedFrom;
   const days = dayStates(report);
   const checkedDays = days.filter(item => item.state === 'checked').length;
   const readOnce = days.filter(item => item.state === 'read_once').length;
@@ -50,12 +49,12 @@ export function Coverage({ report, reclassify, canReclassify, onEarlier = () => 
             {ranges.length === 0 ? <p className="muted">No retrieval range saved yet.</p> : null}
             {notLoaded ? <div className="not-loaded"><p><span>NOT LOADED YET</span>{utc(notLoaded.startTime)} → {utc(notLoaded.endTime)} · {notLoaded.days.toLocaleString()} {noun(notLoaded.days, 'day')}</p>
               <p className="muted">Not scanned yet, so not a gap. Each batch loads {EARLIER_BATCH_DAYS} more days back to {FLOOR_DAY}.</p>
-              {earlier ? <EarlierButton earlier={earlier} disabled={!canEarlier} onEarlier={onEarlier}/> : null}</div> : null}</div>
+              <ScanMoreButton disabled={!canMore} onMore={() => { onMore(loadedFrom - 1); }}/></div> : null}</div>
           <div className="day-states"><h3>Loaded days <span className="muted">· {checkedDays.toLocaleString()} checked · {readOnce.toLocaleString()} read once · newest first</span></h3>
-            <p className="muted">Checked: the day was read in full and its transactions matched a second list from Helius. Read once: loaded before that check existed.</p>
+            <p className="muted">Checked: the day was read in full and its transactions matched a second list from Helius. Read once: loaded before that check existed. Scan more checks a day again.</p>
             <ol className="day-list">{days.map(item => <li key={item.day} className={item.state}><span className="day-date">{item.day}</span>
               <span className="day-state">{DAY_STATE_TEXT[item.state]}</span>
-              {item.state === 'read_once' ? <button type="button" className="rescan-day" disabled={!canRescan} onClick={() => { onRescan(weekOf(report, item.day)); }}>Rescan to double-check</button> : null}</li>)}</ol></div>
+              {item.state !== 'checked' ? <ScanMoreButton disabled={!canMore} onMore={() => { onMore(Math.max(loadedFrom, dayNumber(item.day) * 86400)); }}/> : null}</li>)}</ol></div>
           <div className="pending"><span>Pending local classification: <b>{report.pendingClassification.walletSignatures.toLocaleString()}</b> wallet / <b>{report.pendingClassification.networkSignatures.toLocaleString()}</b> network signatures</span>
             <button type="button" disabled={!canReclassify} onClick={reclassify}>RECLASSIFY LOCALLY</button></div>
         </div>
