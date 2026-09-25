@@ -1,0 +1,44 @@
+# Type checks, lint and unit tests on Windows, macOS and Linux; the browser tests on Linux only, against synthetic fixtures.
+# Nothing here reads a provider key or makes a live provider request.
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Test (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      # pnpm's version comes from packageManager in package.json.
+      - uses: pnpm/action-setup@v4
+      # Node 24.x resolves to the newest 24 release, which is 24.15 or newer as package.json requires.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.x
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm lint
+      - run: pnpm test
+
+  browser:
+    name: Browser tests (ubuntu-latest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.x
+      - run: pnpm install --frozen-lockfile
+      # playwright.config.ts uses the Chrome channel, which the Ubuntu runner image already includes.
+      - run: pnpm test:browser

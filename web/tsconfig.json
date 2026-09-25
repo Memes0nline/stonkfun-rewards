@@ -1,0 +1,5 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": { "module": "ESNext", "moduleResolution": "Bundler", "jsx": "react-jsx", "allowImportingTsExtensions": true },
+  "include": ["./**/*.ts", "./**/*.tsx", "../src/web/view.ts", "../src/web/service.ts"]
+}

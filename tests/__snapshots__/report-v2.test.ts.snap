@@ -1,0 +1,32 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`report schema v2 groups > prints separate CLI groups and full attribution detail addresses 1`] = `
+"StonkFun rewards — 7QpSEQzmYXtCbiSKKZUScWspYBPyeYQbr4KS93kYNrqo
+Provider-attributed evidence; classification and coverage limits apply
+Rewards tracked since 2026-09-12T18:00:00.000Z
+Cutoff: 2026-09-22T18:00:00.000Z
+Last sync: not completed
+Verified — rolling 168 hours: $6.000000; daily average (/7): $0.857143
+Verified — latest 24 hours: $6.000000; tracked cumulative: $6.000000
+Attributed — distributor pattern, not verified: rolling 168 hours: $4.000000; latest 24 hours: unavailable / no priced attributed receipts; tracked cumulative: $4.000000; 2 rows / 2 signatures (feed-witnessed 2; published authority 0; both sources 0)
+Unknown — not counted: 1 rows / 1 signatures; 1 proven credits in 1 mints (token units only)
+Unpriced — excluded from USD, not zero: verified 1; attributed 1 assets
+Timestamped current USD valuation of priced verified receipts, with attributed receipts valued separately; not historical payout-time earnings. Saved prices may be stale.
+Retrieval: partial; gaps: 1. Classification: partial: capped official feed and unknown historical authority validity.
+History: loaded from 2026-09-12; 43 days back to 2026-08-01 not loaded yet (scan --earlier loads the next 7).
+Classification rows — confirmed: 2; attributed (not verified): 2; excluded: 0; unknown candidates: 1.
+Unique signatures — all: 5; confirmed: 2; attributed (not verified): 2; excluded: 0; unknown candidates: 1.
+Confirmed basis — exact official feed: 2; same-slot pattern: 0; verified historical authority: 0.
+Pending local classification: 0 wallet signatures; 0 network signatures (including authority evidence).
+Verified QUOTE [B1Qm8EKyPpgGx8wEtRTWnDsMDnmE6T8pfzCt4zzA1sN7]: 3.000000 — $6.000000 at 2026-09-22T18:00:00.000Z
+Verified THIRD [DiygQHyWEEQY2iNu8RR4SU7d6GAWQACjvJpUtgdxdBmD]: 6.000000 — UNPRICED
+Attributed (not verified) SECOND [3T2cUhgwF4rPPtvbFyT4YJtNCyWdDnamnvutNTy4ZaNZ]: 7.000000 — UNPRICED
+Attributed (not verified) QUOTE [B1Qm8EKyPpgGx8wEtRTWnDsMDnmE6T8pfzCt4zzA1sN7]: 2.000000 — $4.000000 at 2026-09-22T18:00:00.000Z
+GAP: [2026-09-12T18:00:00.000Z, 2026-09-22T18:00:00.000Z)
+attributed [distributor_pattern/feed_witnessed_identity]: trusted_distributor_pattern_and_proven_credit; gross=2000000, net=2000000, decimals=6; source=F1WNRvzdfLohFHuRYQ4YWARqJr79CaNyfNJsbSqN7fb8 (siLHNHbeWga4GfQJAgq198MExcgNNSwdGmnLuax5bTc), destination=DRPcHpDRMkRocoJVnfhcuh9VgncpYUqpq2EQvxxZkun2 (7QpSEQzmYXtCbiSKKZUScWspYBPyeYQbr4KS93kYNrqo); attribution model=distributor-pattern-v1, trust=feed_witnessed_identity, source owner=siLHNHbeWga4GfQJAgq198MExcgNNSwdGmnLuax5bTc, source ATA=F1WNRvzdfLohFHuRYQ4YWARqJr79CaNyfNJsbSqN7fb8, feed-witnessed 3 official distributions (first 2026-09-22T16:53:20.000Z, last 2026-09-22T17:43:20.000Z; before_first_witness, 168800s) — https://solscan.io/tx/2siS9onKKg8W7kSCR5v5wZ3eCfPdZ8ffcnhRem5Z7nPTQrJZyTX758MVDyayoyaaFaFeGG758vaCh1bohtRbr89C
+attributed [distributor_pattern/feed_witnessed_identity]: trusted_distributor_pattern_and_proven_credit; gross=7000000, net=7000000, decimals=6; source=CQZM64gLSKa4fYhg3BLTgrXqVBgtdKSJ2uEFNNiSGfYM (siLHNHbeWga4GfQJAgq198MExcgNNSwdGmnLuax5bTc), destination=5mjfNVovrtFEx3DBLqpPKmbq5x8fb2BjYNutfDua5hAK (7QpSEQzmYXtCbiSKKZUScWspYBPyeYQbr4KS93kYNrqo); attribution model=distributor-pattern-v1, trust=feed_witnessed_identity, source owner=siLHNHbeWga4GfQJAgq198MExcgNNSwdGmnLuax5bTc, source ATA=CQZM64gLSKa4fYhg3BLTgrXqVBgtdKSJ2uEFNNiSGfYM, feed-witnessed 3 official distributions (first 2026-09-22T16:53:20.000Z, last 2026-09-22T17:43:20.000Z; before_first_witness, 773600s) — https://solscan.io/tx/4CY9pEu87kXw3M8YY9LEz3wQfr4pcfKGpKfDmrF1YXD7c4pjK8fNpxnZQrsaxp9SabLiLh2kA1CqMcmTFy4kjNUe
+confirmed [official_feed]: exact_feed_and_proven_credit; gross=3000000, net=3000000, decimals=6; source=F1WNRvzdfLohFHuRYQ4YWARqJr79CaNyfNJsbSqN7fb8 (siLHNHbeWga4GfQJAgq198MExcgNNSwdGmnLuax5bTc), destination=DRPcHpDRMkRocoJVnfhcuh9VgncpYUqpq2EQvxxZkun2 (7QpSEQzmYXtCbiSKKZUScWspYBPyeYQbr4KS93kYNrqo) — https://solscan.io/tx/4EXboADCmWXewF38zTeVqMrDkLYxA5bupVHN75QAZVpnUgRNyydiFZ9MkvfGDuTkbX7eVir1QGGZM87DYR4iP3QH
+unknown_candidate: missing_official_distribution, payout_origin_unverified, ordering_unavailable, distributor_trust_unestablished; gross=11, net=11, decimals=6; source=57Utr2PWS9tsUFATiJh7oLBKj1b81qykZcf3asHdL5jJ (DndKXuVm8FwLdbLsRbY8xATzFfcumVzbUYdHhRvxTcy9), destination=DRPcHpDRMkRocoJVnfhcuh9VgncpYUqpq2EQvxxZkun2 (7QpSEQzmYXtCbiSKKZUScWspYBPyeYQbr4KS93kYNrqo) — https://solscan.io/tx/4rwHNygJr7CEkYNhcj5qZ4pN6ny8SRZSSNBkEPY6ww42iBr43dSU8ANix39vscWJfBqMsAJZoc2Q8mCk7uAeg717
+confirmed [official_feed]: exact_feed_and_proven_credit; gross=6000000, net=6000000, decimals=6; source=8aZqSWv4tBtSNCfg44vHTmBvBcUzjecCJW7yU4ATWx5A (siLHNHbeWga4GfQJAgq198MExcgNNSwdGmnLuax5bTc), destination=4mVvphop2WFsBuHEedC3c26EbTeJS2raKAoYaa5LNajh (7QpSEQzmYXtCbiSKKZUScWspYBPyeYQbr4KS93kYNrqo) — https://solscan.io/tx/KSCuLMp1zAhixQAH6EHcMgj3TP4ih7sZEdoPk1o2vUWTfgK5V9hNwn2KVAWqvvrEFMXY3gVQqfqfaC8xeQJv1hq
+Job: none (unknown). Use --json for structured evidence and UTC daily buckets."
+`;
