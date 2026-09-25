@@ -1,6 +1,6 @@
 {
   "name": "stonkfun-rewards",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Finds the StonkFun holder payouts a Solana wallet received and shows them in a local dashboard.",
   "author": "memeologist99",
   "license": "MIT",

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { SqliteRewardsStore } from '../src/storage/sqlite.js';
@@ -7,10 +7,11 @@ import { admitJob } from '../src/scanner/engine.js';
 import { createRealProviders, WITHDRAW_AUTHORITY_CONFIGURATION_MINT } from '../src/providers/real.js';
 import { DEMO_CUTOFF, DEMO_MINT, DEMO_WALLET, demoTransaction } from '../src/cli/demo.js';
 import type { Job } from '../src/scanner/types.js';
+import { removeTempFolder } from './temp-folder.js';
 
 const stores: SqliteRewardsStore[] = [];
 const directories: string[] = [];
-afterEach(() => { vi.useRealTimers(); for (const store of stores.splice(0)) store.close(); for (const path of directories.splice(0)) rmSync(path, { recursive: true, force: true }); });
+afterEach(async () => { vi.useRealTimers(); for (const store of stores.splice(0)) store.close(); for (const path of directories.splice(0)) await removeTempFolder(path); });
 function setup(fetcher: typeof fetch, liveAllowance = false) {
   const store = new SqliteRewardsStore(':memory:'); stores.push(store);
   let time = DEMO_CUTOFF * 1000;

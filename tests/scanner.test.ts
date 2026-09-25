@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
@@ -21,10 +21,11 @@ import type { FullTransaction } from '../src/helius/schemas.js';
 import type { DistributionEvidenceInput } from '../src/payout-evidence/types.js';
 import type { ScanInput } from '../src/scanner/engine.js';
 import { batch } from './fixtures/payout-evidence.js';
+import { removeTempFolder } from './temp-folder.js';
 
 const directories: string[] = [];
 const stores: SqliteRewardsStore[] = [];
-afterEach(() => { for (const store of stores.splice(0)) { try { store.close(); } catch { /* already closed */ } } for (const path of directories.splice(0)) rmSync(path, { recursive: true, force: true }); });
+afterEach(async () => { for (const store of stores.splice(0)) { try { store.close(); } catch { /* already closed */ } } for (const path of directories.splice(0)) await removeTempFolder(path); });
 function database() { const directory = mkdtempSync(join(tmpdir(), 'rewards-test-')); directories.push(directory); return join(directory, 'test.sqlite'); }
 function open(path = database()) { const store = new SqliteRewardsStore(path); stores.push(store); return store; }
 const provenance = { source: 'fixture' as const, evidenceId: 'synthetic-test', retrievedAt: new Date(cutoff * 1000).toISOString(), commitment: 'finalized' as const };

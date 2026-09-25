@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { SqliteRewardsStore } from '../src/storage/sqlite.js';
@@ -13,12 +13,13 @@ import { historyStatus } from '../web/model.js';
 import type { DemoData } from '../src/cli/demo.js';
 import type { ScanInput } from '../src/scanner/engine.js';
 import type { Job, Range, ScanProgress } from '../src/scanner/types.js';
+import { removeTempFolder } from './temp-folder.js';
 
 const directories: string[] = [];
 const stores: SqliteRewardsStore[] = [];
-afterEach(() => {
+afterEach(async () => {
   for (const store of stores.splice(0)) { try { store.close(); } catch { /* already closed */ } }
-  for (const path of directories.splice(0)) rmSync(path, { recursive: true, force: true });
+  for (const path of directories.splice(0)) await removeTempFolder(path);
 });
 function open() {
   const directory = mkdtempSync(join(tmpdir(), 'history-floor-')); directories.push(directory);

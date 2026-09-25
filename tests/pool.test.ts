@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { createHash } from 'node:crypto';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
@@ -10,9 +10,10 @@ import { runScan } from '../src/scanner/engine.js';
 import { createRealProviders } from '../src/providers/real.js';
 import { DEMO_CUTOFF, DEMO_WALLET, demoFetch } from '../src/cli/demo.js';
 import { feedHeavy } from './fixtures/feed-heavy.js';
+import { removeTempFolder } from './temp-folder.js';
 
 const directories: string[] = [];
-afterEach(() => { for (const path of directories.splice(0)) rmSync(path, { recursive: true, force: true }); });
+afterEach(async () => { for (const path of directories.splice(0)) await removeTempFolder(path); });
 const tick = (ms: number) => new Promise<void>(resolve => { setTimeout(resolve, ms); });
 /** A fixed permutation of delays, so completion order differs from start order the same way every run. */
 const delay = (index: number) => (index * 7919) % 23;

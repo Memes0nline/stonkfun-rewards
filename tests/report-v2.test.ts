@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
@@ -15,15 +15,16 @@ import type { FullTransaction } from '../src/helius/schemas.js';
 import type { HistoryResult } from '../src/helius/types.js';
 import type { Job, Price, Providers } from '../src/scanner/types.js';
 import { CUTOFF, DISTRIBUTOR, iso, MINT, officialFeed, OTHER_DISTRIBUTOR, payout, recipient, SECOND_MINT, syntheticKey, toWallet, WALLET } from './fixtures/distributor.js';
+import { removeTempFolder } from './temp-folder.js';
 
 const network = 'mainnet-beta';
 const THIRD_MINT = syntheticKey('third-quote-mint');
 const provenance = { source: 'fixture' as const, evidenceId: 'synthetic-report-v2', retrievedAt: iso(CUTOFF), commitment: 'finalized' as const };
 const directories: string[] = [];
 const stores: SqliteRewardsStore[] = [];
-afterEach(() => {
+afterEach(async () => {
   for (const store of stores.splice(0)) { try { store.close(); } catch { /* already closed */ } }
-  for (const directory of directories.splice(0)) rmSync(directory, { recursive: true, force: true });
+  for (const directory of directories.splice(0)) await removeTempFolder(directory);
 });
 function database() { const directory = mkdtempSync(join(tmpdir(), 'rewards-report-v2-')); directories.push(directory); return join(directory, 'report.sqlite'); }
 function open(path: string, readOnly = false) { const store = new SqliteRewardsStore(path, { readOnly }); stores.push(store); return store; }

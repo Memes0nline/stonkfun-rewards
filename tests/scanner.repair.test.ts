@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
@@ -11,15 +11,16 @@ import { admitJob } from '../src/scanner/engine.js';
 import { DEMO_CUTOFF as cutoff, DEMO_MINT as mint, DEMO_WALLET as wallet, demoTransaction } from '../src/cli/demo.js';
 import type { EvidenceSet } from '../src/scanner/types.js';
 import type { DistributionEvidenceInput } from '../src/payout-evidence/types.js';
+import { removeTempFolder } from './temp-folder.js';
 
 const network = 'mainnet-beta';
 const provenance = { source: 'fixture' as const, evidenceId: 'legacy-synthetic', retrievedAt: new Date(cutoff * 1000).toISOString(), commitment: 'finalized' as const };
 const directories: string[] = [];
 const stores: SqliteRewardsStore[] = [];
-afterEach(() => {
+afterEach(async () => {
   vi.restoreAllMocks();
   for (const store of stores.splice(0)) { try { store.close(); } catch { /* already closed */ } }
-  for (const directory of directories.splice(0)) rmSync(directory, { recursive: true, force: true });
+  for (const directory of directories.splice(0)) await removeTempFolder(directory);
 });
 function open(path: string) { const store = new SqliteRewardsStore(path); stores.push(store); return store; }
 function drain(store: SqliteRewardsStore, limit = 1) {

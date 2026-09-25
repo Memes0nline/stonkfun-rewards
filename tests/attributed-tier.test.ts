@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { createHash } from 'node:crypto';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
@@ -22,6 +22,7 @@ import {
   payout, recipient, SECOND_MINT, syntheticKey, toWallet, WALLET, WALLET_ACCOUNT,
 } from './fixtures/distributor.js';
 import type { NativeShape, PayoutShape } from './fixtures/distributor.js';
+import { removeTempFolder } from './temp-folder.js';
 
 const network = 'mainnet-beta';
 const WITNESS_TIME = CUTOFF - 1000;
@@ -32,9 +33,9 @@ const GATE_CODES = ['distributor_credit_unreconciled', 'distributor_trust_unesta
   'published_authority_rotation_ambiguous', 'published_authority_snapshot_pending'];
 const directories: string[] = [];
 const stores: SqliteRewardsStore[] = [];
-afterEach(() => {
+afterEach(async () => {
   for (const store of stores.splice(0)) { try { store.close(); } catch { /* already closed */ } }
-  for (const directory of directories.splice(0)) rmSync(directory, { recursive: true, force: true });
+  for (const directory of directories.splice(0)) await removeTempFolder(directory);
 });
 const sig = (tx: FullTransaction) => tx.transaction.signatures[0]!;
 const batch = (from: number, count: number, owner?: string, mint?: string) => Array.from({ length: count }, (_, i) => ({

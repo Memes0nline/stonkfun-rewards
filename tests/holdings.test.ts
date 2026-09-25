@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
@@ -14,6 +14,7 @@ import { DashboardService } from '../src/web/service.js';
 import { DEMO_CUTOFF, DEMO_WALLET, demoData, demoFetch } from '../src/cli/demo.js';
 import type { FullTransaction } from '../src/helius/schemas.js';
 import { CUTOFF, iso, MINT, officialFeed, payout, recipient, syntheticKey, toWallet, WALLET } from './fixtures/distributor.js';
+import { removeTempFolder } from './temp-folder.js';
 
 // SYNTHETIC holdings: every key is a hash of a label, every provider response is a fixture. No request leaves the process.
 const network = 'mainnet-beta';
@@ -21,9 +22,9 @@ const FAST = { perSecond: 100, burst: 10 };
 const NO_RETRY = { retries: 0, baseMs: 1000, maxMs: 30_000, jitter: 0 };
 const directories: string[] = [];
 const stores: SqliteRewardsStore[] = [];
-afterEach(() => {
+afterEach(async () => {
   for (const store of stores.splice(0)) { try { store.close(); } catch { /* already closed */ } }
-  for (const directory of directories.splice(0)) rmSync(directory, { recursive: true, force: true });
+  for (const directory of directories.splice(0)) await removeTempFolder(directory);
 });
 function path() { const directory = mkdtempSync(join(tmpdir(), 'rewards-holdings-')); directories.push(directory); return join(directory, 'holdings.sqlite'); }
 function open(file = path(), readOnly = false) { const store = new SqliteRewardsStore(file, { readOnly }); stores.push(store); return store; }

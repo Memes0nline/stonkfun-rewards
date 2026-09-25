@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { SqliteRewardsStore } from '../src/storage/sqlite.js';
@@ -16,10 +16,11 @@ import { DEMO_CUTOFF, DEMO_WALLET, demoTransaction } from '../src/cli/demo.js';
 import { pairs } from './fixtures/stonkfun.js';
 import { fixtureKey, query, response as historyResponse } from './fixtures/helius.js';
 import type { Providers } from '../src/scanner/types.js';
+import { removeTempFolder } from './temp-folder.js';
 
 const stores: SqliteRewardsStore[] = [];
 const directories: string[] = [];
-afterEach(() => { for (const store of stores.splice(0)) store.close(); for (const path of directories.splice(0)) rmSync(path, { recursive: true, force: true }); });
+afterEach(async () => { for (const store of stores.splice(0)) store.close(); for (const path of directories.splice(0)) await removeTempFolder(path); });
 
 describe('token bucket', () => {
   it('lets a full bucket burst, then refills at the configured rate', () => {

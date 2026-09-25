@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { request } from 'node:http';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createElement } from 'react';
@@ -17,6 +17,7 @@ import { AllLaunches, SourceLaunches, TokensTab } from '../web/Tokens.js';
 import type { SourcesState, SourceToken } from '../web/Tokens.js';
 import type { FullTransaction } from '../src/helius/schemas.js';
 import { CUTOFF, iso, MINT, officialFeed, payout, recipient, SECOND_MINT, syntheticKey, syntheticSignature, toWallet, WALLET } from './fixtures/distributor.js';
+import { removeTempFolder } from './temp-folder.js';
 
 // SYNTHETIC wallet holdings and /rewards summaries. Every key is a hash of a label.
 const network = 'mainnet-beta';
@@ -34,7 +35,7 @@ const closers: (() => Promise<void>)[] = [];
 afterEach(async () => {
   for (const close of closers.splice(0)) await close();
   for (const store of stores.splice(0)) { try { store.close(); } catch { /* already closed */ } }
-  for (const directory of directories.splice(0)) rmSync(directory, { recursive: true, force: true });
+  for (const directory of directories.splice(0)) await removeTempFolder(directory);
 });
 function open() {
   const directory = mkdtempSync(join(tmpdir(), 'rewards-sources-')); directories.push(directory);

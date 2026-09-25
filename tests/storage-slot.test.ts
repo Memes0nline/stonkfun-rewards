@@ -1,19 +1,20 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { SAME_SLOT_SIGNATURES, SqliteRewardsStore } from '../src/storage/sqlite.js';
 import { processDirty } from '../src/scanner/classifier.js';
 import { DEMO_CUTOFF as cutoff, DEMO_WALLET as wallet, demoTransaction } from '../src/cli/demo.js';
+import { removeTempFolder } from './temp-folder.js';
 
 const network = 'mainnet-beta';
 const provenance = { source: 'fixture' as const, evidenceId: 'synthetic-slot', retrievedAt: new Date(cutoff * 1000).toISOString(), commitment: 'finalized' as const };
 const directories: string[] = [];
 const closers: (() => void)[] = [];
-afterEach(() => {
+afterEach(async () => {
   for (const close of closers.splice(0)) { try { close(); } catch { /* already closed */ } }
-  for (const directory of directories.splice(0)) rmSync(directory, { recursive: true, force: true });
+  for (const directory of directories.splice(0)) await removeTempFolder(directory);
 });
 function database() { const directory = mkdtempSync(join(tmpdir(), 'rewards-slot-')); directories.push(directory); return join(directory, 'slot.sqlite'); }
 /** One synthetic transaction per signature character, all in `slot`. */

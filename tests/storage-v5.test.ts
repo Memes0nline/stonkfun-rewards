@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { createHash } from 'node:crypto';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
@@ -15,15 +15,16 @@ import { createRealProviders, WITHDRAW_AUTHORITY_CONFIGURATION_MINT as USDC } fr
 import { DEMO_CUTOFF as cutoff, DEMO_WALLET as wallet, DEMO_WITHDRAW_AUTHORITY, demoData, demoFetch, demoTransaction } from '../src/cli/demo.js';
 import type { DistributionEvidenceInput } from '../src/payout-evidence/types.js';
 import type { Retrieval } from '../src/registry/types.js';
+import { removeTempFolder } from './temp-folder.js';
 
 const network = 'mainnet-beta';
 const at = new Date(cutoff * 1000).toISOString();
 const provenance = { source: 'fixture' as const, evidenceId: 'synthetic-v5', retrievedAt: at, commitment: 'finalized' as const };
 const directories: string[] = [];
 const stores: SqliteRewardsStore[] = [];
-afterEach(() => {
+afterEach(async () => {
   for (const store of stores.splice(0)) { try { store.close(); } catch { /* already closed */ } }
-  for (const directory of directories.splice(0)) rmSync(directory, { recursive: true, force: true });
+  for (const directory of directories.splice(0)) await removeTempFolder(directory);
 });
 function database() { const directory = mkdtempSync(join(tmpdir(), 'rewards-v5-')); directories.push(directory); return join(directory, 'v5.sqlite'); }
 function open(path: string, readOnly = false) { const store = new SqliteRewardsStore(path, { readOnly }); stores.push(store); return store; }

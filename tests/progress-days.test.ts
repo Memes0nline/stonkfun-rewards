@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createElement } from 'react';
@@ -10,6 +10,7 @@ import type { DashboardJob } from '../src/web/service.js';
 import { createRealProviders } from '../src/providers/real.js';
 import { DEMO_CUTOFF, DEMO_WALLET, demoData, demoFetch } from '../src/cli/demo.js';
 import { Progress } from '../web/Progress.js';
+import { removeTempFolder } from './temp-folder.js';
 
 const cleanups: (() => void | Promise<void>)[] = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });
@@ -20,7 +21,7 @@ const DAY = 86400;
 function harness() {
   const directory = mkdtempSync(join(tmpdir(), 'progress-days-'));
   const store = new SqliteRewardsStore(join(directory, 'test.sqlite'));
-  cleanups.push(() => { rmSync(directory, { recursive: true, force: true }); }, () => { store.close(); });
+  cleanups.push(() => removeTempFolder(directory), () => { store.close(); });
   let clock = DEMO_CUTOFF * 1000;
   const now = () => { clock += 1000; return clock; };
   const samples: DashboardJob[] = [];

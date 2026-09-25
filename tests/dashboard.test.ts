@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { request } from 'node:http';
 import type { OutgoingHttpHeaders, IncomingHttpHeaders } from 'node:http';
-import { mkdtempSync, rmSync, readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { DatabaseSync } from 'node:sqlite';
@@ -52,10 +52,11 @@ import type { FullTransaction } from '../src/helius/schemas.js';
 import {
   ata, configurationFeed, CUTOFF, DISTRIBUTOR, iso, MINT, officialFeed, OTHER_DISTRIBUTOR, payout, recipient, SECOND_MINT, syntheticKey, toWallet, WALLET,
 } from './fixtures/distributor.js';
+import { removeTempFolder } from './temp-folder.js';
 
 const cleanups: (() => void | Promise<void>)[] = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });
-function database() { const dir = mkdtempSync(join(tmpdir(), 'dashboard-test-')); cleanups.push(() => { rmSync(dir, { recursive: true, force: true }); }); return join(dir, 'test.sqlite'); }
+function database() { const dir = mkdtempSync(join(tmpdir(), 'dashboard-test-')); cleanups.push(() => removeTempFolder(dir)); return join(dir, 'test.sqlite'); }
 function open(path = database()) { const store = new SqliteRewardsStore(path); cleanups.push(() => { try { store.close(); } catch { /* closed by restart test */ } }); return store; }
 function harness(store = open(), provider?: (signal: AbortSignal) => Providers) {
   let clock = DEMO_CUTOFF * 1000;

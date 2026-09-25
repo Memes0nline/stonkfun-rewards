@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { request } from 'node:http';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { SqliteRewardsStore } from '../src/storage/sqlite.js';
@@ -16,10 +16,11 @@ import { DEMO_CUTOFF as cutoff, DEMO_WALLET as wallet, demoData, demoFetch } fro
 import type { ScanInput } from '../src/scanner/engine.js';
 import type { Providers } from '../src/scanner/types.js';
 import type { Provider, WaitReason } from '../src/providers/limiter.js';
+import { removeTempFolder } from './temp-folder.js';
 
 const cleanups: (() => void | Promise<void>)[] = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });
-function database() { const dir = mkdtempSync(join(tmpdir(), 'layered-report-')); cleanups.push(() => { rmSync(dir, { recursive: true, force: true }); }); return join(dir, 'test.sqlite'); }
+function database() { const dir = mkdtempSync(join(tmpdir(), 'layered-report-')); cleanups.push(() => removeTempFolder(dir)); return join(dir, 'test.sqlite'); }
 function open(path = database()) { const store = new SqliteRewardsStore(path); cleanups.push(() => { try { store.close(); } catch { /* closed */ } }); return store; }
 const DAY = 86400;
 type Override = (host: string, method: string | null) => Promise<Response> | undefined;
